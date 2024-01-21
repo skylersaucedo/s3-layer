@@ -1,4 +1,7 @@
 boto3
+botocore
+requests
+mimetypes
 fastapi==0.85.0
 uvicorn==0.18.3
 python-multipart==0.0.5

@@ -3,15 +3,22 @@ use this to invoke FAST API to
 """
 import uvicorn
 import boto3
+from botocore.exceptions import NoCredentialsError
+import requests
+import mimetypes
+
 from fastapi import FastAPI, File, UploadFile
 import os
 
 bucket = "tsi-mlops"
 os.environ["DEFAULT_S3_BUCKET"] = bucket
 
+ACCESS_KEY_ID = 'AKIAXYKJQH6NFV25A3PF'
+SECRET_ACCESS_KEY = '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'
 
 app = FastAPI()
-s3 = boto3.client('s3')
+
+s3 = boto3.client('s3', aws_access_key_id=ACCESS_KEY_ID, aws_secret_access_key=SECRET_ACCESS_KEY)
 
 @app.get("/")
 def index():
@@ -19,8 +26,28 @@ def index():
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    s3.upload_fileobj(file.file, bucket, file.filename)
-    return {"message": "File uploaded successfully!"}
+    try:
+
+        remote_url = 'https://github.com/skylersaucedo/s3-layer/blob/main/testimg.png'
+        file_name = file.filename
+        extension = file.content_type
+
+        imageResponse = requests.get(remote_url, stream=True).raw
+        print('img response: ', imageResponse)
+        content_type = imageResponse.headers['content-type']
+        extension = mimetypes.guess_extension(content_type)
+        print('extension: ', extension)
+        #extension = '.png'
+        s3.upload_fileobj(imageResponse, bucket, file_name + extension)
+        print("Upload Successful")
+        return {"message": "File uploaded successfully!"}
+    except FileNotFoundError:
+        print("The file was not found")
+        return {"message": "The file was not found"}
+    except NoCredentialsError:
+        print("Credentials not available")
+        return {"message": "no creds!"}
+    
 
 @app.get("/download")
 async def download_file(file_name: str):
