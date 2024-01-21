@@ -13,6 +13,10 @@ os.environ["DEFAULT_S3_BUCKET"] = bucket
 app = FastAPI()
 s3 = boto3.client('s3')
 
+@app.get("/")
+def index():
+    return {"message": "Hello S3 Layer for MLOps 21Jan2024"}
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     s3.upload_fileobj(file.file, bucket, file.filename)
