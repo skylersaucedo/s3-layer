@@ -13,8 +13,8 @@ import os
 bucket = "tsi-mlops"
 os.environ["DEFAULT_S3_BUCKET"] = bucket
 
-ACCESS_KEY_ID = 'AKIAXYKJQH6NFV25A3PF'
-SECRET_ACCESS_KEY = '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'
+ACCESS_KEY_ID = '***'
+SECRET_ACCESS_KEY = '****'
 
 app = FastAPI()
 
