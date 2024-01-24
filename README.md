@@ -16,10 +16,10 @@ pip install -r requirements.txt
 
 ### Running the API
 
-To run the API, run the following command in the app directory:
+To run the API, run the following command in the root directory:
 
 ```bash
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 ### Testing the API
@@ -35,3 +35,21 @@ To test the API, run the following command in the main directory:
 ```bash
 pytest app
 ```
+
+## Database
+
+The database is in MariaDB. To generate the database schema, run the following command in the root directory:
+
+```bash
+python -m app.db.commands.generate_ddl
+```
+
+To create a test API key, run the following command in the root directory:
+
+```bash
+python -m app.db.commands.create_api_key
+```
+
+## API Documentation
+
+The API documentation is available at `/docs` and `/redoc`.
