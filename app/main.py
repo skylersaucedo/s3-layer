@@ -1,9 +1,11 @@
 import boto3
-from fastapi import Depends, FastAPI, Form, File, UploadFile
+from fastapi import Depends, FastAPI, Form, File, UploadFile, status
+from fastapi.exceptions import HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasicCredentials
 from sqlalchemy import insert, select
 from typing import Annotated
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from .db.models import DatasetObject, DatasetObjectTag
 from .db.engine import SessionLocal
@@ -73,6 +75,7 @@ def dataset_upload_file(
             )
 
     session.commit()
+    session.close()
 
     return {
         "status": "OK",
@@ -82,15 +85,34 @@ def dataset_upload_file(
 
 
 @app.get("/dataset/download-file/{file_guid}")
-def download_file(
-    file_guid: str,
+def dataset_download_file(
+    file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
 ):
-    return {"message": "File downloaded successfully!"}
+    session = SessionLocal()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    file = file_result[0]  # DatasetObject is in the first element of the tuple
+
+    s3 = boto3.client("s3")
+
+    s3_object = s3.get_object(
+        Bucket=settings.dataset_s3_bucket,
+        Key=file.s3_object_name,
+    )
+
+    return StreamingResponse(content=s3_object["Body"].iter_chunks())
 
 
 @app.get("/dataset/list-files")
-def list_files(
+def dataset_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
 ):
     """List all files in the dataset."""
@@ -99,10 +121,12 @@ def list_files(
     files_query = select(DatasetObject).order_by("name")
     files_result = session.execute(files_query).all()
 
+    session.close()
+
     files_list = []
 
-    for f in files_result:
-        file = f[0]
+    for row in files_result:
+        file = row[0]  # DatasetObject is in the first element of the tuple
         tags = file.tags(session=session)
 
         files_list.append(

@@ -6,7 +6,7 @@ Uses FastAPI to create a REST API for uploading assets to S3 buckets.
 
 ### Prerequisites
 
-Python 3.11 is required to run this project. It is recommended to use a virtual environment to run this project.
+Python 3.11 is required to run this project. It is also strongly recommended to use a virtual environment.
 
 ```bash
 python -m venv venv
