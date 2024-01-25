@@ -116,7 +116,19 @@ def test_dataset_list_files():
     )
 
     assert response.status_code == 200
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
-    assert len(resonse_json["files"]) == resonse_json["count"]
+    assert response_json["status"] == "OK"
+    assert len(response_json["files"]) == response_json["count"]
+
+    response = client.get(
+        "/dataset/list-files",
+        params={"tags": ["test"]},
+        auth=(api_key, secret),
+    )
+
+    assert response.status_code == 200
+    response_json = response.json()
+
+    assert response_json["status"] == "OK"
+    assert len(response_json["files"]) == response_json["count"]

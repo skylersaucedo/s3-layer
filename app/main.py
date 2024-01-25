@@ -114,6 +114,7 @@ def dataset_download_file(
 @app.get("/dataset/list-files")
 def dataset_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    search_tags: Annotated[list[str], Form(...)] = None,
 ):
     """List all files in the dataset."""
     session = SessionLocal()
@@ -124,10 +125,14 @@ def dataset_list_files(
     session.close()
 
     files_list = []
+    search_tags_set = frozenset(search_tags) if search_tags else {}
 
     for row in files_result:
         file = row[0]  # DatasetObject is in the first element of the tuple
-        tags = file.tags(session=session)
+        tags = frozenset([t[0].tag for t in file.tags(session=session)])
+
+        if search_tags and len(tags.intersection(search_tags_set)) > 0:
+            continue
 
         files_list.append(
             {
@@ -135,7 +140,7 @@ def dataset_list_files(
                 "name": file.name,
                 "s3_object_name": file.s3_object_name,
                 "content_type": file.content_type,
-                "tags": [t[0].tag for t in tags],
+                "tags": tags,
             }
         )
 
