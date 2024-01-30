@@ -10,10 +10,8 @@ class Settings(BaseSettings):
     db_password: str = ""
     db_name: str = "tubesml"
     secret_key: str = "secret"
-    aws_access_key_id: str = ""
-    aws_secret_access_key: str = ""
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 @lru_cache

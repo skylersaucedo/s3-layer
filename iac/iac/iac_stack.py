@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_ecs_patterns as ecs_patterns,
     Reference,
 )
+import aws_cdk as cdk
 from constructs import Construct
 
 
@@ -36,15 +37,46 @@ class IacStack(Stack):
             enable_dns_support=True,
         )
 
+        db_credentials_secret = secretsmanager.Secret(
+            self,
+            "tubesml-db-credentials-secret",
+            secret_name="tubesml-db-credentials",
+            generate_secret_string=secretsmanager.SecretStringGenerator(
+                exclude_punctuation=True,
+                include_space=False,
+                password_length=20,
+                secret_string_template='{"username": "tubesml"}',
+                generate_string_key="password",
+            ),
+        )
+
+        app_secret = secretsmanager.Secret(
+            self,
+            "tube-ml-app-secret",
+            secret_name="tube-ml-app-secret",
+            generate_secret_string=secretsmanager.SecretStringGenerator(
+                exclude_punctuation=True,
+                include_space=False,
+                password_length=36,
+                secret_string_template="{}",
+                generate_string_key="secret",
+            ),
+        )
+
+        db_creds = rds.Credentials.from_secret(
+            secret=db_credentials_secret,
+            username="tubesml",
+        )
+
         database = rds.DatabaseInstance(
             self,
             "tubesml-db",
             database_name="tubesml",
             instance_identifier="tubesml",
-            credentials=rds.Credentials.from_generated_secret(
-                username="tubesml", secret_name="tubesml-db-password"
+            credentials=db_creds,
+            engine=rds.DatabaseInstanceEngine.maria_db(
+                version=rds.MariaDbEngineVersion.VER_10_11_6
             ),
-            engine=rds.DatabaseInstanceEngine.MARIADB,
             instance_type=ec2.InstanceType.of(
                 ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MICRO
             ),
@@ -54,6 +86,7 @@ class IacStack(Stack):
             port=3306,
             deletion_protection=False,
             publicly_accessible=True,
+            allow_major_version_upgrade=True,
         )
 
         database.connections.allow_default_port_internally()
@@ -67,25 +100,26 @@ class IacStack(Stack):
         #
 
         # ECR Repository for API container
-        # ecr_repository = ecr.Repository(
-        #     self,
-        #     "tubesml-api",
-        #     repository_name="tubesml-api",
-        # )
+        ecr_repository = ecr.Repository(
+            self,
+            "tubesml-api",
+            repository_name="tubesml-api",
+        )
 
-        # We have a chicken-and-egg problem, because we just created the ECR repo but have not
-        # yet pushed an image to it, so we're going to use a test image to get the ECS service
-        # running and then we'll update the image in the deployment pipeline.
-        # container_image = ecs.ContainerImage.from_ecr_repository(
-        #     repository=ecr_repository,
-        #     tag="latest",
-        # )
+        # S3 Bucket for dataset storage
+        dataset_bucket = s3.Bucket(
+            self,
+            "tubesml-dataset-bucket",
+            bucket_name="tubesml-dataset",
+            public_read_access=False,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
 
         #
         # Compute
         #
 
-        # # ECS Cluster
+        # ECS Cluster
         cluster = ecs.Cluster(
             self,
             "tubesml-api-cluster",
@@ -93,16 +127,37 @@ class IacStack(Stack):
             vpc=vpc,
         )
 
-        ecs_patterns.ApplicationLoadBalancedFargateService(
+        ecs_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self,
             "tubesml-api-service",
             cluster=cluster,
             cpu=512,
             desired_count=1,
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
-                image=ecs.ContainerImage.from_registry("amazon/amazon-ecs-sample")
+                image=ecs.ContainerImage.from_ecr_repository(
+                    repository=ecr_repository,
+                    tag="latest",
+                ),
+                container_port=8000,
+                secrets={
+                    "DB_PASSWORD": ecs.Secret.from_secrets_manager(
+                        db_credentials_secret, field="password"
+                    ),
+                    "SECRET_KEY": ecs.Secret.from_secrets_manager(
+                        app_secret, field="secret"
+                    ),
+                },
+                environment={
+                    "DB_HOST": database.db_instance_endpoint_address,
+                    "DB_PORT": database.db_instance_endpoint_port,
+                    "DB_USERNAME": "tubesml",
+                    "DB_NAME": "tubesml",
+                    "DATASET_S3_BUCKET": dataset_bucket.bucket_name,
+                },
             ),
             memory_limit_mib=1024,  # Default is 512
             public_load_balancer=True,
             assign_public_ip=True,
+            service_name="tubesml-api",
+            listener_port=80,
         )
