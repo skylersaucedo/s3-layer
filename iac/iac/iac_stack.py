@@ -4,9 +4,11 @@ from aws_cdk import (
     aws_ecs as ecs,
     aws_ec2 as ec2,
     aws_rds as rds,
+    aws_route53 as route53,
     aws_s3 as s3,
     aws_secretsmanager as secretsmanager,
     aws_ecs_patterns as ecs_patterns,
+    aws_certificatemanager as acm,
     Reference,
 )
 import aws_cdk as cdk
@@ -127,18 +129,41 @@ class IacStack(Stack):
             vpc=vpc,
         )
 
+        hosted_zone = route53.HostedZone.from_lookup(
+            self, "tubesml-hosted-zone", domain_name="tsi-mlops.com"
+        )
+
+        certificate = acm.Certificate(
+            self,
+            "tubesml-certificate",
+            domain_name="tsi-mlops.com",
+            subject_alternative_names=["*.tsi-mlops.com"],
+            validation=acm.CertificateValidation.from_dns(hosted_zone),
+        )
+
         ecs_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self,
             "tubesml-api-service",
+            assign_public_ip=True,
             cluster=cluster,
             cpu=512,
+            certificate=certificate,
             desired_count=1,
+            domain_name="api.tsi-mlops.com",
+            domain_zone=hosted_zone,
+            listener_port=443,
+            memory_limit_mib=1024,  # Default is 512
+            public_load_balancer=True,
+            # redirect_http=True,
+            service_name="tubesml-api",
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_ecr_repository(
                     repository=ecr_repository,
                     tag="latest",
                 ),
                 container_port=8000,
+                container_name="web",
+                family="tubesml-api",
                 secrets={
                     "DB_PASSWORD": ecs.Secret.from_secrets_manager(
                         db_credentials_secret, field="password"
@@ -155,9 +180,4 @@ class IacStack(Stack):
                     "DATASET_S3_BUCKET": dataset_bucket.bucket_name,
                 },
             ),
-            memory_limit_mib=1024,  # Default is 512
-            public_load_balancer=True,
-            assign_public_ip=True,
-            service_name="tubesml-api",
-            listener_port=80,
         )
