@@ -14,7 +14,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Running the API
+### Running the API Locally
 
 To run the API, run the following command in the root directory:
 
@@ -36,7 +36,7 @@ To test the API, run the following command in the main directory:
 pytest app
 ```
 
-## Database
+### Database
 
 The database is in MariaDB. To generate the database schema, run the following command in the root directory:
 
@@ -52,4 +52,8 @@ python -m app.db.commands.create_api_key
 
 ## API Documentation
 
-The API documentation is available at `/docs` and `/redoc`.
+The API documentation is available at `/docs` and `/redoc`. You can view the current production documentation at [https://api.tubesml.com/docs](https://api.tubesml.com/docs) or [https://api.tubesml.com/redoc](https://api.tubesml.com/redoc).
+
+### API Examples
+
+test.ipynb is a Jupyter notebook that contains examples of how to use the API.

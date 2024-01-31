@@ -154,7 +154,7 @@ class IacStack(Stack):
             listener_port=443,
             memory_limit_mib=1024,  # Default is 512
             public_load_balancer=True,
-            # redirect_http=True,
+            redirect_http=True,
             service_name="tubesml-api",
             task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
                 image=ecs.ContainerImage.from_ecr_repository(
@@ -180,4 +180,13 @@ class IacStack(Stack):
                     "DATASET_S3_BUCKET": dataset_bucket.bucket_name,
                 },
             ),
+        )
+
+        database.connections.allow_default_port_from(
+            ecs_service.service, description="Allow access to the database from the API"
+        )
+
+        dataset_bucket.grant_read_write(ecs_service.task_definition.task_role)
+        dataset_bucket.grant_read_write(
+            ecs_service.service.task_definition.execution_role
         )
