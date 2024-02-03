@@ -204,7 +204,7 @@ def model_upload_file(
 
 
 @app.get("/model/download-file/{file_guid}")
-def dataset_download_file(
+def model_download_file(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
 ):
@@ -231,11 +231,11 @@ def dataset_download_file(
 
 
 @app.get("/model/list-files")
-def dataset_list_files(
+def model_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     search_tags: Annotated[list[str], Form(...)] = None,
 ):
-    """List all files in the dataset."""
+    """List all files in the model."""
     session = SessionLocal()
 
     files_query = select(MLModelObject).order_by("name")
