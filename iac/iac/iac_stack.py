@@ -93,7 +93,7 @@ class IacStack(Stack):
 
         database.connections.allow_default_port_internally()
         database.connections.allow_default_port_from(
-            ec2.Peer.ipv4("65.163.126.128/32"),
+            ec2.Peer.ipv4("170.62.7.110/32"),
             description="Allow access to the database from Seths home IP",
         )  # Seth's Computer
 
@@ -113,6 +113,15 @@ class IacStack(Stack):
             self,
             "tubesml-dataset-bucket",
             bucket_name="tubesml-dataset",
+            public_read_access=False,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+
+        # S3 Bucket for dataset storage
+        model_bucket = s3.Bucket(
+            self,
+            "tubesml-model-bucket",
+            bucket_name="tubesml-model",
             public_read_access=False,
             removal_policy=cdk.RemovalPolicy.DESTROY,
         )
@@ -152,6 +161,7 @@ class IacStack(Stack):
             domain_name="api.tsi-mlops.com",
             domain_zone=hosted_zone,
             listener_port=443,
+            # load_balancer_name="tubesml-api-lb",
             memory_limit_mib=1024,  # Default is 512
             public_load_balancer=True,
             redirect_http=True,
@@ -178,6 +188,7 @@ class IacStack(Stack):
                     "DB_USERNAME": "tubesml",
                     "DB_NAME": "tubesml",
                     "DATASET_S3_BUCKET": dataset_bucket.bucket_name,
+                    "MLMODEL_S3_BUCKET": model_bucket.bucket_name,
                 },
             ),
         )
@@ -188,5 +199,10 @@ class IacStack(Stack):
 
         dataset_bucket.grant_read_write(ecs_service.task_definition.task_role)
         dataset_bucket.grant_read_write(
+            ecs_service.service.task_definition.execution_role
+        )
+
+        model_bucket.grant_read_write(ecs_service.task_definition.task_role)
+        model_bucket.grant_read_write(
             ecs_service.service.task_definition.execution_role
         )

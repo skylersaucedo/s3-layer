@@ -1,0 +1,21 @@
+{
+  "availability-zones:account=533266972570:region=us-west-2": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c",
+    "us-west-2d"
+  ],
+  "hosted-zone:account=533266972570:domainName=tsi-mlops.com:region=us-west-2": {
+    "Id": "/hostedzone/Z016691616YCD53Y4HN8I",
+    "Name": "tsi-mlops.com."
+  },
+  "availability-zones:account=533266972570:region=us-east-2": [
+    "us-east-2a",
+    "us-east-2b",
+    "us-east-2c"
+  ],
+  "hosted-zone:account=533266972570:domainName=tsi-mlops.com:region=us-east-2": {
+    "Id": "/hostedzone/Z016691616YCD53Y4HN8I",
+    "Name": "tsi-mlops.com."
+  }
+}

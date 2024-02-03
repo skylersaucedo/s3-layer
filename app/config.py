@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     dataset_s3_bucket: str = "test-bucket"
+    mlmodel_s3_bucket: str = "test-bucket"
     db_host: str = "localhost"
     db_port: int = 3306
     db_username: str = "root"

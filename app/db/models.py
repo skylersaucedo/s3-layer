@@ -79,3 +79,45 @@ class DatasetObjectTag(Base):
 
     def __str__(self):
         return f"<DatasetObjectTag(dataset_object_id={self.dataset_object_id}, tag={self.tag}>"
+
+
+class MLModelObject(Base):
+    __tablename__ = "mlmodel_objects"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(512))
+    s3_object_name: Mapped[str] = mapped_column(String(512), unique=True, index=True)
+    content_type = mapped_column(String(128))
+
+    def __repr__(self):
+        return f"<MLModel(name={self.name}, s3_object_name={self.s3_object_name}>"
+
+    def __str__(self):
+        return f"<MLModel(name={self.name}, s3_object_name={self.s3_object_name}>"
+
+    def tags(self, session):
+        stmt = select(MLModelObjectTag).where(
+            MLModelObjectTag.mlmodel_object_id == self.id
+        )
+
+        result = session.execute(stmt)
+
+        return result.all()
+
+
+class MLModelObjectTag(Base):
+    __tablename__ = "mlmodel_object_tags"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, index=True
+    )
+    mlmodel_object_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    tag: Mapped[str] = mapped_column(String(64), index=True)
+
+    def __repr__(self):
+        return f"<MLModelObjectTag(model_object_id={self.mlmodel_object_id}, tag={self.tag}>"
+
+    def __str__(self):
+        return f"<MLModelObjectTag(model_object_id={self.mlmodel_object_id}, tag={self.tag}>"
