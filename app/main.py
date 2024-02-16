@@ -111,6 +111,29 @@ def dataset_download_file(
     return StreamingResponse(content=s3_object["Body"].iter_chunks())
 
 
+@app.get("/dataset/file-details/{file_guid}")
+def dataset_download_file(
+    file_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+):
+    session = SessionLocal()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    file = file_result[0]  # DatasetObject is in the first element of the tuple
+
+    return {
+        "status": "OK",
+        "file": file.as_dict(session=session),
+    }
+
+
 @app.get("/dataset/list-files")
 def dataset_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],

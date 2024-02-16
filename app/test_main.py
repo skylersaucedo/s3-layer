@@ -107,6 +107,43 @@ def test_dataset_download_file():
     assert response.content == b"some test data"
 
 
+@mock_s3
+def test_dataset_file_details():
+    api_key, secret = create_api_key("test_dataset_file_details")
+
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+
+    file_contents = io.BytesIO(b"some test data")
+
+    upload_response = client.post(
+        "/dataset/upload-file",
+        files={"file": ("test_file.csv", file_contents)},
+        data={"tags": ["test"]},
+        auth=(api_key, secret),
+    )
+
+    assert upload_response.status_code == 200
+    upload_resonse_json = upload_response.json()
+
+    assert upload_resonse_json["status"] == "OK"
+    dataset_object_id = upload_resonse_json["dataset_object_id"]
+
+    details_response = client.get(
+        f"/dataset/file-details/{dataset_object_id}",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    assert details_response_json["status"] == "OK"
+    assert details_response_json["file"]["id"] == dataset_object_id
+    assert details_response_json["file"]["name"] == "test_file.csv"
+    assert details_response_json["file"]["content_type"] == "application/vnd.ms-excel"
+    assert details_response_json["file"]["tags"] == ["test"]
+
+
 def test_dataset_list_files():
     api_key, secret = create_api_key("test_list_files")
 
