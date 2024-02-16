@@ -52,7 +52,7 @@ python -m app.db.commands.create_api_key
 
 ## API Documentation
 
-The API documentation is available at `/docs` and `/redoc`. You can view the current production documentation at [https://api.tubesml.com/docs](https://api.tubesml.com/docs) or [https://api.tubesml.com/redoc](https://api.tubesml.com/redoc).
+The API documentation is available at `/docs` and `/redoc`. You can view the current production documentation at [https://api.tsi-mlops.com/docs](https://api.tsi-mlops.com/docs) or [https://api.tsi-mlops.com/redoc](https://api.tsi-mlops.com/redoc).
 
 ### API Examples
 
