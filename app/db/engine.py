@@ -8,6 +8,7 @@ settings = get_settings()
 engine = create_engine(
     f"mysql+mysqldb://{settings.db_username}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}",
     echo=False,
+    pool_recycle=600,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
