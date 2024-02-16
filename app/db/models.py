@@ -55,6 +55,15 @@ class DatasetObject(Base):
     def __str__(self):
         return f"<Dataset(name={self.name}, s3_object_name={self.s3_object_name}>"
 
+    def as_dict(self, session):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "s3_object_name": self.s3_object_name,
+            "content_type": self.content_type,
+            "tags": set([t[0].tag for t in self.tags(session)]),
+        }
+
     def tags(self, session):
         stmt = select(DatasetObjectTag).where(
             DatasetObjectTag.dataset_object_id == self.id
@@ -96,6 +105,15 @@ class MLModelObject(Base):
 
     def __str__(self):
         return f"<MLModel(name={self.name}, s3_object_name={self.s3_object_name}>"
+
+    def as_dict(self, session):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "s3_object_name": self.s3_object_name,
+            "content_type": self.content_type,
+            "tags": set([t[0].tag for t in self.tags()]),
+        }
 
     def tags(self, session):
         stmt = select(MLModelObjectTag).where(
