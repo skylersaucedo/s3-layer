@@ -61,12 +61,41 @@ class DatasetObject(Base):
             "name": self.name,
             "s3_object_name": self.s3_object_name,
             "content_type": self.content_type,
-            "tags": set([t[0].tag for t in self.tags(session)]),
+            "tags": sorted(
+                [
+                    {
+                        "tag_guid": t[0].id,
+                        "tag": t[0].tag,
+                    }
+                    for t in self.tags(session)
+                ],
+                key=lambda x: x["tag"],
+            ),
+            "labels": sorted(
+                [
+                    {
+                        "label_guid": l[0].id,
+                        "label": l[0].label,
+                        "polygon": l[0].polygon,
+                    }
+                    for l in self.labels(session)
+                ],
+                key=lambda x: x["label"],
+            ),
         }
 
     def tags(self, session):
         stmt = select(DatasetObjectTag).where(
             DatasetObjectTag.dataset_object_id == self.id
+        )
+
+        result = session.execute(stmt)
+
+        return result.all()
+
+    def labels(self, session):
+        stmt = select(DatasetObjectLabel).where(
+            DatasetObjectLabel.dataset_object_id == self.id
         )
 
         result = session.execute(stmt)
@@ -88,6 +117,23 @@ class DatasetObjectTag(Base):
 
     def __str__(self):
         return f"<DatasetObjectTag(dataset_object_id={self.dataset_object_id}, tag={self.tag}>"
+
+
+class DatasetObjectLabel(Base):
+    __tablename__ = "dataset_object_labels"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, index=True
+    )
+    dataset_object_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    label: Mapped[str] = mapped_column(String(128), index=True)
+    polygon: Mapped[str] = mapped_column(String(1024))
+
+    def __repr__(self):
+        return f"<DatasetObjectLabel(dataset_object_id={self.dataset_object_id}, label={self.label}>"
+
+    def __str__(self):
+        return f"<DatasetObjectLabel(dataset_object_id={self.dataset_object_id}, label={self.label}>"
 
 
 class MLModelObject(Base):

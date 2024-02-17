@@ -27,7 +27,7 @@ def test_dataset_upload_file():
     file_contents = io.BytesIO(b"some test data")
 
     response = client.post(
-        "/dataset/upload-file",
+        "/dataset",
         files={"file": ("test_file.csv", file_contents)},
         data={"tags": ["test"]},
         auth=(api_key, secret),
@@ -50,7 +50,7 @@ def test_dataset_upload_file():
 
 def test_dataset_upload_file_no_auth():
     response = client.post(
-        "/dataset/upload-file",
+        "/dataset",
         files={"file": ("test_file.csv", b"some test data")},
     )
 
@@ -65,7 +65,7 @@ def test_dataset_upload_file_no_file():
     api_key, secret = create_api_key("test_dataset_upload_file")
 
     response = client.post(
-        "/dataset/upload-file",
+        "/dataset",
         auth=(api_key, secret),
     )
 
@@ -85,7 +85,7 @@ def test_dataset_download_file():
     file_contents = io.BytesIO(b"some test data")
 
     response = client.post(
-        "/dataset/upload-file",
+        "/dataset",
         files={"file": ("test_file.csv", file_contents)},
         data={"tags": ["test"]},
         auth=(api_key, secret),
@@ -99,7 +99,7 @@ def test_dataset_download_file():
     dataset_object_id = resonse_json["dataset_object_id"]
 
     response = client.get(
-        f"/dataset/download-file/{dataset_object_id}",
+        f"/dataset/{dataset_object_id}",
         auth=(api_key, secret),
     )
 
@@ -117,7 +117,7 @@ def test_dataset_file_details():
     file_contents = io.BytesIO(b"some test data")
 
     upload_response = client.post(
-        "/dataset/upload-file",
+        "/dataset",
         files={"file": ("test_file.csv", file_contents)},
         data={"tags": ["test"]},
         auth=(api_key, secret),
@@ -130,7 +130,7 @@ def test_dataset_file_details():
     dataset_object_id = upload_resonse_json["dataset_object_id"]
 
     details_response = client.get(
-        f"/dataset/file-details/{dataset_object_id}",
+        f"/dataset/{dataset_object_id}/details",
         auth=(api_key, secret),
     )
 
@@ -141,14 +141,233 @@ def test_dataset_file_details():
     assert details_response_json["file"]["id"] == dataset_object_id
     assert details_response_json["file"]["name"] == "test_file.csv"
     assert details_response_json["file"]["content_type"] == "application/vnd.ms-excel"
-    assert details_response_json["file"]["tags"] == ["test"]
+    assert details_response_json["file"]["tags"][0]["tag"] == "test"
+    assert (
+        details_response_json["file"]["s3_object_name"]
+        == upload_resonse_json["s3_object_name"]
+    )
+    assert details_response_json["file"]["labels"] == []
+
+
+@mock_s3
+def test_dataset_file_add_tags():
+    api_key, secret = create_api_key("test_dataset_file_add_tags")
+
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+
+    file_contents = io.BytesIO(b"some test data")
+
+    upload_response = client.post(
+        "/dataset",
+        files={"file": ("test_file.csv", file_contents)},
+        data={"tags": ["test"]},
+        auth=(api_key, secret),
+    )
+
+    assert upload_response.status_code == 200
+    upload_resonse_json = upload_response.json()
+
+    assert upload_resonse_json["status"] == "OK"
+    dataset_object_id = upload_resonse_json["dataset_object_id"]
+
+    add_tags_response = client.post(
+        f"/dataset/{dataset_object_id}/tags",
+        data={"tag": "test tag"},
+        auth=(api_key, secret),
+    )
+
+    assert add_tags_response.status_code == 200
+    add_tags_response_json = add_tags_response.json()
+
+    assert add_tags_response_json["status"] == "OK"
+    assert add_tags_response_json["tag"]["tag"] == "test tag"
+
+    details_response = client.get(
+        f"/dataset/{dataset_object_id}/details",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    assert "test" in details_response_json["file"]["tags"][0]["tag"]
+    assert "test tag" in details_response_json["file"]["tags"][1]["tag"]
+
+
+@mock_s3
+def test_dataset_file_delete_tag():
+    api_key, secret = create_api_key("test_dataset_file_delete_tags")
+
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+
+    file_contents = io.BytesIO(b"some test data")
+
+    upload_response = client.post(
+        "/dataset",
+        files={"file": ("test_file.csv", file_contents)},
+        data={"tags": ["test", "test tag"]},
+        auth=(api_key, secret),
+    )
+
+    assert upload_response.status_code == 200
+    upload_resonse_json = upload_response.json()
+
+    assert upload_resonse_json["status"] == "OK"
+    dataset_object_id = upload_resonse_json["dataset_object_id"]
+
+    details_response = client.get(
+        f"/dataset/{dataset_object_id}/details",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    tag_guid = details_response_json["file"]["tags"][0]["tag_guid"]
+
+    delete_tags_response = client.delete(
+        f"/dataset/{dataset_object_id}/tags/{tag_guid}",
+        auth=(api_key, secret),
+    )
+
+    assert delete_tags_response.status_code == 200
+    delete_tags_response_json = delete_tags_response.json()
+
+    assert delete_tags_response_json["status"] == "OK"
+
+    details_response = client.get(
+        f"/dataset/{dataset_object_id}/details",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    assert len(details_response_json["file"]["tags"]) == 1
+
+
+@mock_s3
+def test_dataset_file_add_label():
+    api_key, secret = create_api_key("test_dataset_file_add_label")
+
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+
+    file_contents = io.BytesIO(b"some test data")
+
+    upload_response = client.post(
+        "/dataset",
+        files={"file": ("test_file.csv", file_contents)},
+        data={"tags": ["test"]},
+        auth=(api_key, secret),
+    )
+
+    assert upload_response.status_code == 200
+    upload_resonse_json = upload_response.json()
+
+    assert upload_resonse_json["status"] == "OK"
+    dataset_object_id = upload_resonse_json["dataset_object_id"]
+
+    add_label_response = client.post(
+        f"/dataset/{dataset_object_id}/labels",
+        data={"label": "test label", "polygon": "0,0,0,1,1,1,1,0"},
+        auth=(api_key, secret),
+    )
+
+    assert add_label_response.status_code == 200
+    add_label_response_json = add_label_response.json()
+
+    assert add_label_response_json["status"] == "OK"
+    assert add_label_response_json["label"]["label"] == "test label"
+    assert add_label_response_json["label"]["polygon"] == "0,0,0,1,1,1,1,0"
+
+    details_response = client.get(
+        f"/dataset/{dataset_object_id}/details",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    assert len(details_response_json["file"]["labels"]) == 1
+    assert details_response_json["file"]["labels"][0]["label"] == "test label"
+
+
+@mock_s3
+def test_dataset_file_delete_label():
+    api_key, secret = create_api_key("test_dataset_file_add_label")
+
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+
+    file_contents = io.BytesIO(b"some test data")
+
+    upload_response = client.post(
+        "/dataset",
+        files={"file": ("test_file.csv", file_contents)},
+        data={"tags": ["test"]},
+        auth=(api_key, secret),
+    )
+
+    assert upload_response.status_code == 200
+    upload_resonse_json = upload_response.json()
+
+    assert upload_resonse_json["status"] == "OK"
+    dataset_object_id = upload_resonse_json["dataset_object_id"]
+
+    add_label_response = client.post(
+        f"/dataset/{dataset_object_id}/labels",
+        data={"label": "test label", "polygon": "0,0,0,1,1,1,1,0"},
+        auth=(api_key, secret),
+    )
+
+    assert add_label_response.status_code == 200
+    add_label_response_json = add_label_response.json()
+
+    assert add_label_response_json["status"] == "OK"
+    assert add_label_response_json["label"]["label"] == "test label"
+    assert add_label_response_json["label"]["polygon"] == "0,0,0,1,1,1,1,0"
+
+    details_response = client.get(
+        f"/dataset/{dataset_object_id}/details",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    assert len(details_response_json["file"]["labels"]) == 1
+    assert details_response_json["file"]["labels"][0]["label"] == "test label"
+    label_guid = details_response_json["file"]["labels"][0]["label_guid"]
+
+    delete_label_response = client.delete(
+        f"/dataset/{dataset_object_id}/labels/{label_guid}",
+        auth=(api_key, secret),
+    )
+
+    assert delete_label_response.status_code == 200
+    delete_label_response_json = delete_label_response.json()
+
+    assert delete_label_response_json["status"] == "OK"
+
+    details_response = client.get(
+        f"/dataset/{dataset_object_id}/details",
+        auth=(api_key, secret),
+    )
+
+    assert details_response.status_code == 200
+    details_response_json = details_response.json()
+
+    assert len(details_response_json["file"]["labels"]) == 0
 
 
 def test_dataset_list_files():
     api_key, secret = create_api_key("test_list_files")
 
     response = client.get(
-        "/dataset/list-files",
+        "/dataset",
         auth=(api_key, secret),
     )
 
@@ -159,7 +378,7 @@ def test_dataset_list_files():
     assert len(response_json["files"]) == response_json["count"]
 
     response = client.get(
-        "/dataset/list-files",
+        "/dataset",
         params={"tags": ["test"]},
         auth=(api_key, secret),
     )
@@ -181,7 +400,7 @@ def test_model_upload_file():
     file_contents = io.BytesIO(b"some test data")
 
     response = client.post(
-        "/model/upload-file",
+        "/models",
         files={"file": ("test_file.csv", file_contents)},
         data={"tags": ["test"]},
         auth=(api_key, secret),
@@ -204,7 +423,7 @@ def test_model_upload_file():
 
 def test_model_upload_file_no_auth():
     response = client.post(
-        "/model/upload-file",
+        "/models",
         files={"file": ("test_file.csv", b"some test data")},
     )
 
@@ -219,7 +438,7 @@ def test_model_upload_file_no_file():
     api_key, secret = create_api_key("test_model_upload_file")
 
     response = client.post(
-        "/model/upload-file",
+        "/models",
         auth=(api_key, secret),
     )
 
@@ -239,7 +458,7 @@ def test_model_download_file():
     file_contents = io.BytesIO(b"some test data")
 
     response = client.post(
-        "/model/upload-file",
+        "/models",
         files={"file": ("test_file.csv", file_contents)},
         data={"tags": ["test"]},
         auth=(api_key, secret),
@@ -253,7 +472,7 @@ def test_model_download_file():
     model_object_id = resonse_json["model_object_id"]
 
     response = client.get(
-        f"/model/download-file/{model_object_id}",
+        f"/models/{model_object_id}",
         auth=(api_key, secret),
     )
 
@@ -265,7 +484,7 @@ def test_model_list_files():
     api_key, secret = create_api_key("test_list_files")
 
     response = client.get(
-        "/model/list-files",
+        "/models",
         auth=(api_key, secret),
     )
 
@@ -276,7 +495,7 @@ def test_model_list_files():
     assert len(response_json["files"]) == response_json["count"]
 
     response = client.get(
-        "/model/list-files",
+        "/models",
         params={"tags": ["test"]},
         auth=(api_key, secret),
     )

@@ -9,15 +9,14 @@ security = HTTPBasic()
 
 
 def authenticate_user(credentials: HTTPBasicCredentials = Depends(security)):
-    session = SessionLocal()
+    with SessionLocal() as session:
+        stmt = select(APICredentials).where(
+            APICredentials.api_key == credentials.username.encode("utf8")
+        )
 
-    stmt = select(APICredentials).where(
-        APICredentials.api_key == credentials.username.encode("utf8")
-    )
+        result = session.execute(stmt)
 
-    result = session.execute(stmt)
-
-    valid_users = result.all()
+        valid_users = result.all()
 
     if len(valid_users) == 0 or len(valid_users) > 1:
         raise HTTPException(
