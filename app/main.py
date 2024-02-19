@@ -115,6 +115,46 @@ def dataset_download_file(
     return StreamingResponse(content=s3_object["Body"].iter_chunks())
 
 
+@app.delete("/dataset/{file_guid}")
+def dataset_delete_file(
+    file_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+):
+    with SessionLocal() as session:
+        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+        file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    file_object = file_result[0]  # DatasetObject is in the first element of the tuple
+
+    s3 = boto3.client("s3")
+
+    s3.delete_object(
+        Bucket=settings.dataset_s3_bucket,
+        Key=file_object.s3_object_name,
+    )
+
+    with SessionLocal() as session:
+        session.execute(
+            DatasetObjectTag.__table__.delete().where(
+                DatasetObjectTag.dataset_object_id == file_guid,
+            )
+        )
+        session.commit()
+
+        session.execute(
+            DatasetObject.__table__.delete().where(DatasetObject.id == file_guid)
+        )
+        session.commit()
+
+    return {"status": "OK"}
+
+
 @app.post("/dataset/{file_guid}/tags")
 def dataset_file_add_tag(
     file_guid: UUID,

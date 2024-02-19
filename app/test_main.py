@@ -108,6 +108,51 @@ def test_dataset_download_file():
 
 
 @mock_s3
+def test_dataset_delete_file():
+    api_key, secret = create_api_key("test_dataset_upload_file")
+
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+
+    file_contents = io.BytesIO(b"some test data")
+
+    response = client.post(
+        "/dataset",
+        files={"file": ("test_file.csv", file_contents)},
+        data={"tags": ["test"]},
+        auth=(api_key, secret),
+    )
+
+    assert response.status_code == 200
+
+    resonse_json = response.json()
+
+    assert resonse_json["status"] == "OK"
+
+    dataset_object_id = resonse_json["dataset_object_id"]
+
+    response = client.delete(
+        f"/dataset/{dataset_object_id}",
+        auth=(api_key, secret),
+    )
+
+    assert response.status_code == 200
+    resonse_json = response.json()
+
+    assert resonse_json["status"] == "OK"
+
+    response = client.get(
+        f"/dataset/{dataset_object_id}",
+        auth=(api_key, secret),
+    )
+
+    assert response.status_code == 404
+    resonse_json = response.json()
+
+    assert resonse_json["detail"] == "File not found"
+
+
+@mock_s3
 def test_dataset_file_details():
     api_key, secret = create_api_key("test_dataset_file_details")
 
