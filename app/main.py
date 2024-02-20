@@ -14,6 +14,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasicCredentials
 from mimetypes import init as mimetypes_init, guess_type
+from pydantic import BaseModel
 from sqlalchemy import insert, select
 from typing import Annotated
 from uuid import uuid4, UUID
@@ -29,6 +30,31 @@ from .db.engine import SessionLocal
 from .auth import authenticate_user
 
 
+class BasicResponse(BaseModel):
+    status: str
+
+
+class Label(BaseModel):
+    label: str
+    polygon: str
+
+
+class Node(BaseModel):
+    left: float
+    top: float
+
+
+class Prediction(BaseModel):
+    label: str
+    confidence: float
+    polygon: list[Node]
+
+
+class InferenceResponse(BaseModel):
+    status: str
+    predictions: list[Prediction]
+
+
 mimetypes_init()
 
 dotenv.load_dotenv()
@@ -38,7 +64,7 @@ app.debug = os.getenv("DEBUG", False)
 
 
 @app.get("/")
-def get_index():
+def get_index() -> BasicResponse:
     """A simple health check endpoint to make sure that the API is up and running."""
     return {"status": "OK"}
 
@@ -46,7 +72,7 @@ def get_index():
 @app.post("/")
 def post_index(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
-):
+) -> BasicResponse:
     """A simple health check endpoint to make sure that the API is up and running with authentication."""
     return {"status": "OK"}
 
@@ -132,7 +158,7 @@ def dataset_download_file(
 def dataset_delete_file(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
-):
+) -> BasicResponse:
     with SessionLocal() as session:
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
         file_result = session.execute(file_query).one_or_none()
@@ -210,7 +236,7 @@ def dataset_file_delete_tag(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     tag_guid: UUID,
-):
+) -> BasicResponse:
     with SessionLocal() as session:
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
         file_result = session.execute(file_query).one_or_none()
@@ -291,7 +317,7 @@ def dataset_file_delete_label(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     label_guid: UUID,
-):
+) -> BasicResponse:
     with SessionLocal() as session:
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
         file_result = session.execute(file_query).one_or_none()
@@ -320,6 +346,54 @@ def dataset_file_delete_label(
             DatasetObjectLabel.__table__.delete().where(
                 DatasetObjectLabel.dataset_object_id == file_guid,
                 DatasetObjectLabel.id == label_guid,
+            )
+        )
+        session.commit()
+
+    return {"status": "OK"}
+
+
+@app.put("/dataset/{file_guid}/labels/{label_guid}")
+def dataset_file_update_label(
+    file_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    label_guid: UUID,
+    label: Annotated[str, Form(...)],
+    polygon: Annotated[str, Form(...)],
+) -> BasicResponse:
+    with SessionLocal() as session:
+        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+        file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    with SessionLocal() as session:
+        label_query = select(DatasetObjectLabel).where(
+            DatasetObjectLabel.dataset_object_id == file_guid,
+            DatasetObjectLabel.id == label_guid,
+        )
+        label_result = session.execute(label_query).one_or_none()
+
+    if not label_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Label not found",
+        )
+
+    with SessionLocal() as session:
+        session.execute(
+            DatasetObjectLabel.__table__.update()
+            .where(
+                DatasetObjectLabel.dataset_object_id == file_guid,
+                DatasetObjectLabel.id == label_guid,
+            )
+            .values(
+                label=label,
+                polygon=polygon,
             )
         )
         session.commit()
@@ -500,4 +574,160 @@ def model_list_files(
         "status": "OK",
         "files": files_list,
         "count": len(files_list),
+    }
+
+
+@app.delete("/models/{file_guid}")
+def model_delete_file(
+    file_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+) -> BasicResponse:
+    with SessionLocal() as session:
+        file_query = select(MLModelObject).where(MLModelObject.id == file_guid)
+        file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    file_object = file_result[0]  # ModelObject is in the first element of the tuple
+
+    s3 = boto3.client("s3")
+
+    s3.delete_object(
+        Bucket=os.environ["MLMODEL_S3_BUCKET"],
+        Key=file_object.s3_object_name,
+    )
+
+    with SessionLocal() as session:
+        session.execute(
+            MLModelObjectTag.__table__.delete().where(
+                MLModelObjectTag.mlmodel_object_id == file_guid,
+            )
+        )
+        session.commit()
+
+        session.execute(
+            MLModelObject.__table__.delete().where(MLModelObject.id == file_guid)
+        )
+        session.commit()
+
+    return {"status": "OK"}
+
+
+@app.post("/models/{file_guid}/tags")
+def model_file_add_tag(
+    file_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    tag: Annotated[str, Form(...)],
+):
+    with SessionLocal() as session:
+        file_query = select(MLModelObject).where(MLModelObject.id == file_guid)
+        file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    with SessionLocal() as session:
+        tag_guid = uuid4()
+        session.execute(
+            insert(MLModelObjectTag).values(
+                id=tag_guid,
+                mlmodel_object_id=file_guid,
+                tag=tag,
+            )
+        )
+
+        session.commit()
+
+    return {
+        "status": "OK",
+        "tag": {
+            "tag_guid": tag_guid,
+            "tag": tag,
+        },
+    }
+
+
+@app.delete("/models/{file_guid}/tags/{tag_guid}")
+def model_file_delete_tag(
+    file_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    tag_guid: UUID,
+) -> BasicResponse:
+    with SessionLocal() as session:
+        file_query = select(MLModelObject).where(MLModelObject.id == file_guid)
+        file_result = session.execute(file_query).one_or_none()
+
+    if not file_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    with SessionLocal() as session:
+        tag_query = select(MLModelObjectTag).where(
+            MLModelObjectTag.mlmodel_object_id == file_guid,
+            MLModelObjectTag.id == tag_guid,
+        )
+        tag_result = session.execute(tag_query).one_or_none()
+
+    if not tag_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found",
+        )
+
+    with SessionLocal() as session:
+        session.execute(
+            MLModelObjectTag.__table__.delete().where(
+                MLModelObjectTag.mlmodel_object_id == file_guid,
+                MLModelObjectTag.id == tag_guid,
+            )
+        )
+        session.commit()
+
+    return {"status": "OK"}
+
+
+@app.post("/models/inference")
+def model_file_inference(
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    file: Annotated[UploadFile, File(...)],
+) -> InferenceResponse:
+    return {
+        "status": "OK",
+        "predictions": [
+            {
+                "label": "crack",
+                "confidence": 0.9,
+                "polygon": [
+                    {"left": 0.8072916666666666, "top": 0.24825581395348836},
+                    {"left": 0.7291666666666666, "top": 0.2802325581395349},
+                    {"left": 0.7113715277777778, "top": 0.45058139534883723},
+                    {"left": 0.7035590277777778, "top": 0.6186046511627907},
+                    {"left": 0.8229166666666666, "top": 0.6546511627906977},
+                    {"left": 0.8919270833333334, "top": 0.6343023255813953},
+                    {"left": 0.9088541666666666, "top": 0.5238372093023256},
+                    {"left": 0.9123263888888888, "top": 0.37209302325581395},
+                    {"left": 0.8940972222222222, "top": 0.2744186046511628},
+                    {"left": 0.8441840277777778, "top": 0.2558139534883721},
+                ],
+            },
+            {
+                "label": "crack",
+                "confidence": 0.4,
+                "polygon": [
+                    {"left": 0.10, "top": 0.10},
+                    {"left": 0.20, "top": 0.10},
+                    {"left": 0.20, "top": 0.20},
+                    {"left": 0.10, "top": 0.20},
+                ],
+            },
+        ],
     }

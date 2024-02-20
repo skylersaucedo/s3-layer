@@ -1,6 +1,7 @@
 import boto3
 import dotenv
 import io
+import json
 import os
 
 dotenv.load_dotenv()
@@ -320,7 +321,10 @@ def test_dataset_file_add_label():
 
     add_label_response = client.post(
         f"/dataset/{dataset_object_id}/labels",
-        data={"label": "test label", "polygon": "0,0,0,1,1,1,1,0"},
+        data={
+            "label": "test label",
+            "polygon": json.dumps([{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]),
+        },
         auth=(api_key, secret),
     )
 
@@ -329,7 +333,9 @@ def test_dataset_file_add_label():
 
     assert add_label_response_json["status"] == "OK"
     assert add_label_response_json["label"]["label"] == "test label"
-    assert add_label_response_json["label"]["polygon"] == "0,0,0,1,1,1,1,0"
+    assert add_label_response_json["label"]["polygon"] == json.dumps(
+        [{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]
+    )
 
     details_response = client.get(
         f"/dataset/{dataset_object_id}/details",
@@ -367,7 +373,10 @@ def test_dataset_file_delete_label():
 
     add_label_response = client.post(
         f"/dataset/{dataset_object_id}/labels",
-        data={"label": "test label", "polygon": "0,0,0,1,1,1,1,0"},
+        data={
+            "label": "test label",
+            "polygon": json.dumps([{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]),
+        },
         auth=(api_key, secret),
     )
 
@@ -376,7 +385,9 @@ def test_dataset_file_delete_label():
 
     assert add_label_response_json["status"] == "OK"
     assert add_label_response_json["label"]["label"] == "test label"
-    assert add_label_response_json["label"]["polygon"] == "0,0,0,1,1,1,1,0"
+    assert add_label_response_json["label"]["polygon"] == json.dumps(
+        [{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]
+    )
 
     details_response = client.get(
         f"/dataset/{dataset_object_id}/details",
@@ -553,3 +564,20 @@ def test_model_list_files():
 
     assert response_json["status"] == "OK"
     assert len(response_json["files"]) == response_json["count"]
+
+
+def test_model_file_inference():
+    api_key, secret = create_api_key("test_model_file_inference")
+
+    response = client.post(
+        "/models/inference",
+        files={"file": ("test_file.csv", b"some test data")},
+        auth=(api_key, secret),
+    )
+
+    assert response.status_code == 200
+
+    response_json = response.json()
+
+    assert response_json["status"] == "OK"
+    assert len(response_json["predictions"]) == 2
