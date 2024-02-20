@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import uuid
 
@@ -77,13 +78,12 @@ class DatasetObject(Base):
                     {
                         "label_guid": l[0].id,
                         "label": l[0].label,
-                        "polygon": l[0].polygon,
+                        "polygon": json.loads(l[0].polygon or "[]"),
                     }
                     for l in self.labels(session)
                 ],
                 key=lambda x: x["label"],
             ),
-            "label_count": len(self.labels(session)),
         }
 
     def tags(self, session):
