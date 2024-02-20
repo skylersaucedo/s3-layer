@@ -1,12 +1,13 @@
-import uuid
 import hashlib
-from .engine import Base
-from ..config import get_settings
+import os
+import uuid
+
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import Mapped
-from sqlalchemy import select, String, UUID
+from sqlalchemy import select, String, Text, UUID
 
-settings = get_settings()
+
+from .engine import Base
 
 
 class APICredentials(Base):
@@ -28,7 +29,7 @@ class APICredentials(Base):
 
     @classmethod
     def hash_password(self, password: str, salt: str) -> str:
-        salted_password = password + salt + settings.secret_key
+        salted_password = password + salt + os.environ["SECRET_KEY"]
         hashed_password = hashlib.sha256(salted_password.encode("utf8")).hexdigest()
 
         return hashed_password
@@ -82,6 +83,7 @@ class DatasetObject(Base):
                 ],
                 key=lambda x: x["label"],
             ),
+            "label_count": len(self.labels(session)),
         }
 
     def tags(self, session):
@@ -127,7 +129,7 @@ class DatasetObjectLabel(Base):
     )
     dataset_object_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     label: Mapped[str] = mapped_column(String(128), index=True)
-    polygon: Mapped[str] = mapped_column(String(1024))
+    polygon: Mapped[str] = mapped_column(Text)
 
     def __repr__(self):
         return f"<DatasetObjectLabel(dataset_object_id={self.dataset_object_id}, label={self.label}>"

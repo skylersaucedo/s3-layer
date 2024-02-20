@@ -18,9 +18,15 @@ pip install -r requirements.txt
 
 To run the API, run the following command in the root directory:
 
+#### Linux
+
 ```bash
 uvicorn app.main:app --reload
 ```
+
+#### Windows
+
+There's a bug in Windows Cython that prevents this from working correctly. https://github.com/encode/uvicorn/issues/1972. There are no clean work-arounds short of monkey-patching Cython or uvicorn.
 
 ### Testing the API
 

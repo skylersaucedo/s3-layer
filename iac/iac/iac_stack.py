@@ -185,7 +185,7 @@ class IacStack(Stack):
                 environment={
                     "DB_HOST": database.db_instance_endpoint_address,
                     "DB_PORT": database.db_instance_endpoint_port,
-                    "DB_USERNAME": "tubesml",
+                    "DB_USER": "tubesml",
                     "DB_NAME": "tubesml",
                     "DATASET_S3_BUCKET": dataset_bucket.bucket_name,
                     "MLMODEL_S3_BUCKET": model_bucket.bucket_name,

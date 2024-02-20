@@ -1,14 +1,17 @@
 import boto3
+import dotenv
+import io
+import os
+
+dotenv.load_dotenv()
+
 from fastapi.testclient import TestClient
 from moto import mock_s3
-import io
 
 from .main import app
-from .config import get_settings
 from .db.commands.create_api_key import create_api_key
 
 client = TestClient(app)
-settings = get_settings()
 
 
 def test_index():
@@ -22,7 +25,7 @@ def test_dataset_upload_file():
     api_key, secret = create_api_key("test_dataset_upload_file")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -34,14 +37,14 @@ def test_dataset_upload_file():
     )
 
     assert response.status_code == 200
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
+    assert response_json["status"] == "OK"
 
-    s3_object_name = resonse_json["s3_object_name"]
+    s3_object_name = response_json["s3_object_name"]
 
     s3_object = s3_client.get_object(
-        Bucket=settings.dataset_s3_bucket,
+        Bucket=os.environ["DATASET_S3_BUCKET"],
         Key=s3_object_name,
     )
 
@@ -55,9 +58,9 @@ def test_dataset_upload_file_no_auth():
     )
 
     assert response.status_code == 401
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["detail"] == "Not authenticated"
+    assert response_json["detail"] == "Not authenticated"
 
 
 @mock_s3
@@ -70,9 +73,9 @@ def test_dataset_upload_file_no_file():
     )
 
     assert response.status_code == 422
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["detail"][0]["msg"] == "Field required"
+    assert response_json["detail"][0]["msg"] == "Field required"
 
 
 @mock_s3
@@ -80,7 +83,7 @@ def test_dataset_download_file():
     api_key, secret = create_api_key("test_dataset_upload_file")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -92,11 +95,11 @@ def test_dataset_download_file():
     )
 
     assert response.status_code == 200
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
+    assert response_json["status"] == "OK"
 
-    dataset_object_id = resonse_json["dataset_object_id"]
+    dataset_object_id = response_json["dataset_object_id"]
 
     response = client.get(
         f"/dataset/{dataset_object_id}",
@@ -112,7 +115,7 @@ def test_dataset_delete_file():
     api_key, secret = create_api_key("test_dataset_upload_file")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -125,11 +128,11 @@ def test_dataset_delete_file():
 
     assert response.status_code == 200
 
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
+    assert response_json["status"] == "OK"
 
-    dataset_object_id = resonse_json["dataset_object_id"]
+    dataset_object_id = response_json["dataset_object_id"]
 
     response = client.delete(
         f"/dataset/{dataset_object_id}",
@@ -137,9 +140,9 @@ def test_dataset_delete_file():
     )
 
     assert response.status_code == 200
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
+    assert response_json["status"] == "OK"
 
     response = client.get(
         f"/dataset/{dataset_object_id}",
@@ -147,9 +150,9 @@ def test_dataset_delete_file():
     )
 
     assert response.status_code == 404
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["detail"] == "File not found"
+    assert response_json["detail"] == "File not found"
 
 
 @mock_s3
@@ -157,7 +160,7 @@ def test_dataset_file_details():
     api_key, secret = create_api_key("test_dataset_file_details")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -169,10 +172,10 @@ def test_dataset_file_details():
     )
 
     assert upload_response.status_code == 200
-    upload_resonse_json = upload_response.json()
+    upload_response_json = upload_response.json()
 
-    assert upload_resonse_json["status"] == "OK"
-    dataset_object_id = upload_resonse_json["dataset_object_id"]
+    assert upload_response_json["status"] == "OK"
+    dataset_object_id = upload_response_json["dataset_object_id"]
 
     details_response = client.get(
         f"/dataset/{dataset_object_id}/details",
@@ -189,7 +192,7 @@ def test_dataset_file_details():
     assert details_response_json["file"]["tags"][0]["tag"] == "test"
     assert (
         details_response_json["file"]["s3_object_name"]
-        == upload_resonse_json["s3_object_name"]
+        == upload_response_json["s3_object_name"]
     )
     assert details_response_json["file"]["labels"] == []
 
@@ -199,7 +202,7 @@ def test_dataset_file_add_tags():
     api_key, secret = create_api_key("test_dataset_file_add_tags")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -211,10 +214,10 @@ def test_dataset_file_add_tags():
     )
 
     assert upload_response.status_code == 200
-    upload_resonse_json = upload_response.json()
+    upload_response_json = upload_response.json()
 
-    assert upload_resonse_json["status"] == "OK"
-    dataset_object_id = upload_resonse_json["dataset_object_id"]
+    assert upload_response_json["status"] == "OK"
+    dataset_object_id = upload_response_json["dataset_object_id"]
 
     add_tags_response = client.post(
         f"/dataset/{dataset_object_id}/tags",
@@ -245,7 +248,7 @@ def test_dataset_file_delete_tag():
     api_key, secret = create_api_key("test_dataset_file_delete_tags")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -257,10 +260,10 @@ def test_dataset_file_delete_tag():
     )
 
     assert upload_response.status_code == 200
-    upload_resonse_json = upload_response.json()
+    upload_response_json = upload_response.json()
 
-    assert upload_resonse_json["status"] == "OK"
-    dataset_object_id = upload_resonse_json["dataset_object_id"]
+    assert upload_response_json["status"] == "OK"
+    dataset_object_id = upload_response_json["dataset_object_id"]
 
     details_response = client.get(
         f"/dataset/{dataset_object_id}/details",
@@ -298,7 +301,7 @@ def test_dataset_file_add_label():
     api_key, secret = create_api_key("test_dataset_file_add_label")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -310,10 +313,10 @@ def test_dataset_file_add_label():
     )
 
     assert upload_response.status_code == 200
-    upload_resonse_json = upload_response.json()
+    upload_response_json = upload_response.json()
 
-    assert upload_resonse_json["status"] == "OK"
-    dataset_object_id = upload_resonse_json["dataset_object_id"]
+    assert upload_response_json["status"] == "OK"
+    dataset_object_id = upload_response_json["dataset_object_id"]
 
     add_label_response = client.post(
         f"/dataset/{dataset_object_id}/labels",
@@ -345,7 +348,7 @@ def test_dataset_file_delete_label():
     api_key, secret = create_api_key("test_dataset_file_add_label")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.dataset_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -357,10 +360,10 @@ def test_dataset_file_delete_label():
     )
 
     assert upload_response.status_code == 200
-    upload_resonse_json = upload_response.json()
+    upload_response_json = upload_response.json()
 
-    assert upload_resonse_json["status"] == "OK"
-    dataset_object_id = upload_resonse_json["dataset_object_id"]
+    assert upload_response_json["status"] == "OK"
+    dataset_object_id = upload_response_json["dataset_object_id"]
 
     add_label_response = client.post(
         f"/dataset/{dataset_object_id}/labels",
@@ -440,7 +443,7 @@ def test_model_upload_file():
     api_key, secret = create_api_key("test_model_upload_file")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.mlmodel_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["MLMODEL_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -452,14 +455,14 @@ def test_model_upload_file():
     )
 
     assert response.status_code == 200
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
+    assert response_json["status"] == "OK"
 
-    s3_object_name = resonse_json["s3_object_name"]
+    s3_object_name = response_json["s3_object_name"]
 
     s3_object = s3_client.get_object(
-        Bucket=settings.mlmodel_s3_bucket,
+        Bucket=os.environ["MLMODEL_S3_BUCKET"],
         Key=s3_object_name,
     )
 
@@ -473,9 +476,9 @@ def test_model_upload_file_no_auth():
     )
 
     assert response.status_code == 401
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["detail"] == "Not authenticated"
+    assert response_json["detail"] == "Not authenticated"
 
 
 @mock_s3
@@ -488,9 +491,9 @@ def test_model_upload_file_no_file():
     )
 
     assert response.status_code == 422
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["detail"][0]["msg"] == "Field required"
+    assert response_json["detail"][0]["msg"] == "Field required"
 
 
 @mock_s3
@@ -498,7 +501,7 @@ def test_model_download_file():
     api_key, secret = create_api_key("test_model_upload_file")
 
     s3_client = boto3.client("s3", region_name="us-east-1")
-    s3_client.create_bucket(Bucket=settings.mlmodel_s3_bucket)
+    s3_client.create_bucket(Bucket=os.environ["MLMODEL_S3_BUCKET"])
 
     file_contents = io.BytesIO(b"some test data")
 
@@ -510,11 +513,11 @@ def test_model_download_file():
     )
 
     assert response.status_code == 200
-    resonse_json = response.json()
+    response_json = response.json()
 
-    assert resonse_json["status"] == "OK"
+    assert response_json["status"] == "OK"
 
-    model_object_id = resonse_json["model_object_id"]
+    model_object_id = response_json["model_object_id"]
 
     response = client.get(
         f"/models/{model_object_id}",

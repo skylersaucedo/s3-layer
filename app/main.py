@@ -1,8 +1,19 @@
 import boto3
-from fastapi import Depends, FastAPI, Form, File, UploadFile, status
+import dotenv
+import os
+
+from fastapi import (
+    Depends,
+    FastAPI,
+    Form,
+    File,
+    UploadFile,
+    status,
+)
 from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasicCredentials
+from mimetypes import init as mimetypes_init, guess_type
 from sqlalchemy import insert, select
 from typing import Annotated
 from uuid import uuid4, UUID
@@ -16,12 +27,14 @@ from .db.models import (
 )
 from .db.engine import SessionLocal
 from .auth import authenticate_user
-from .config import get_settings
+
+
+mimetypes_init()
+
+dotenv.load_dotenv()
 
 app = FastAPI()
-
-
-settings = get_settings()
+app.debug = os.getenv("DEBUG", False)
 
 
 @app.get("/")
@@ -47,13 +60,13 @@ def dataset_upload_file(
     s3 = boto3.client("s3")
 
     file_name = file.filename
-    content_type = file.content_type
+    content_type, encoding = guess_type(file.filename)
 
     s3_object_name = f"{uuid4()}-{file_name}"
 
     s3.upload_fileobj(
         file.file,
-        settings.dataset_s3_bucket,
+        os.environ["DATASET_S3_BUCKET"],
         s3_object_name,
     )
 
@@ -108,7 +121,7 @@ def dataset_download_file(
     s3 = boto3.client("s3")
 
     s3_object = s3.get_object(
-        Bucket=settings.dataset_s3_bucket,
+        Bucket=os.environ["DATASET_S3_BUCKET"],
         Key=file.s3_object_name,
     )
 
@@ -135,7 +148,7 @@ def dataset_delete_file(
     s3 = boto3.client("s3")
 
     s3.delete_object(
-        Bucket=settings.dataset_s3_bucket,
+        Bucket=os.environ["DATASET_S3_BUCKET"],
         Key=file_object.s3_object_name,
     )
 
@@ -323,17 +336,19 @@ def dataset_file_details(
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
         file_result = session.execute(file_query).one_or_none()
 
+        file = file_result[0]  # DatasetObject is in the first element of the tuple
+
+        file_as_dict = file.as_dict(session=session)
+
     if not file_result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
         )
 
-    file = file_result[0]  # DatasetObject is in the first element of the tuple
-
     return {
         "status": "OK",
-        "file": file.as_dict(session=session),
+        "file": file_as_dict,
     }
 
 
@@ -389,7 +404,7 @@ def model_upload_file(
 
     s3.upload_fileobj(
         file.file,
-        settings.mlmodel_s3_bucket,
+        os.environ["MLMODEL_S3_BUCKET"],
         s3_object_name,
     )
 
@@ -444,7 +459,7 @@ def model_download_file(
     s3 = boto3.client("s3")
 
     s3_object = s3.get_object(
-        Bucket=settings.mlmodel_s3_bucket,
+        Bucket=os.environ["MLMODEL_S3_BUCKET"],
         Key=file.s3_object_name,
     )
 

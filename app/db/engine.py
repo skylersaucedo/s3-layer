@@ -1,12 +1,11 @@
 from sqlalchemy import create_engine
-from ..config import get_settings
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
-settings = get_settings()
+import os
 
 engine = create_engine(
-    f"mysql+mysqldb://{settings.db_username}:{settings.db_password}@{settings.db_host}:{settings.db_port}/{settings.db_name}",
+    f"mysql+mysqldb://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}@{os.environ['DB_HOST']}:{os.environ['DB_PORT']}/{os.environ['DB_NAME']}",
     echo=False,
     pool_recycle=600,
     pool_pre_ping=True,
