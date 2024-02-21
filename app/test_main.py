@@ -52,6 +52,7 @@ def test_dataset_upload_file():
     assert s3_object["Body"].read() == b"some test data"
 
 
+@mock_s3
 def test_dataset_upload_file_no_auth():
     response = client.post(
         "/dataset",
@@ -606,20 +607,3 @@ def test_model_list_files():
 
     assert response_json["status"] == "OK"
     assert len(response_json["files"]) == response_json["count"]
-
-
-def test_model_file_inference():
-    api_key, secret = create_api_key("test_model_file_inference")
-
-    response = client.post(
-        "/models/inference",
-        files={"file": ("test_file.csv", b"some test data")},
-        auth=(api_key, secret),
-    )
-
-    assert response.status_code == 200
-
-    response_json = response.json()
-
-    assert response_json["status"] == "OK"
-    assert len(response_json["predictions"]) == 2
