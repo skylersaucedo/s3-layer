@@ -31,10 +31,10 @@ def detect_defects(image_data: cv2.typing.MatLike, model_data) -> list[Predictio
         "retinanet_resnet50_fpn",
     )
 
-    checkpoint = torch.load(model_data)
-    resnet_model.load_state_dict(checkpoint["model"])
-
     device = torch.device("cpu")
+
+    checkpoint = torch.load(model_data, map_location=device)
+    resnet_model.load_state_dict(checkpoint["model"])
 
     CLASSES = ["scratch", "dent", "paint", "pit", "none"]
 
