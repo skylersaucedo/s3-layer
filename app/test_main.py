@@ -323,7 +323,12 @@ def test_dataset_file_add_label():
         f"/dataset/{dataset_object_id}/labels",
         data={
             "label": "test label",
-            "polygon": json.dumps([{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]),
+            "polygon": json.dumps(
+                [
+                    {"left": 0.1, "top": 0.1, "begin_frame": 0, "end_frame": 0},
+                    {"left": 0.9, "top": 0.1, "begin_frame": 0, "end_frame": 0},
+                ]
+            ),
         },
         auth=(api_key, secret),
     )
@@ -333,9 +338,20 @@ def test_dataset_file_add_label():
 
     assert add_label_response_json["status"] == "OK"
     assert add_label_response_json["label"]["label"] == "test label"
-    assert add_label_response_json["label"]["polygon"] == json.dumps(
-        [{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]
-    )
+    assert len(add_label_response_json["label"]["polygon"]) == 2
+
+    assert add_label_response_json["label"]["polygon"][0] == {
+        "left": 0.1,
+        "top": 0.1,
+        "begin_frame": 0,
+        "end_frame": 0,
+    }
+    assert add_label_response_json["label"]["polygon"][1] == {
+        "left": 0.9,
+        "top": 0.1,
+        "begin_frame": 0,
+        "end_frame": 0,
+    }
 
     details_response = client.get(
         f"/dataset/{dataset_object_id}/details",
@@ -375,7 +391,22 @@ def test_dataset_file_delete_label():
         f"/dataset/{dataset_object_id}/labels",
         data={
             "label": "test label",
-            "polygon": json.dumps([{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]),
+            "polygon": json.dumps(
+                [
+                    {
+                        "left": 0.1,
+                        "top": 0.1,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.9,
+                        "top": 0.1,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                ]
+            ),
         },
         auth=(api_key, secret),
     )
@@ -385,9 +416,20 @@ def test_dataset_file_delete_label():
 
     assert add_label_response_json["status"] == "OK"
     assert add_label_response_json["label"]["label"] == "test label"
-    assert add_label_response_json["label"]["polygon"] == json.dumps(
-        [{"left": 0.1, "top": 0.1, "left": 0.9, "top": 0.1}]
-    )
+    assert len(add_label_response_json["label"]["polygon"]) == 2
+
+    assert add_label_response_json["label"]["polygon"][0] == {
+        "left": 0.1,
+        "top": 0.1,
+        "begin_frame": 0,
+        "end_frame": 0,
+    }
+    assert add_label_response_json["label"]["polygon"][1] == {
+        "left": 0.9,
+        "top": 0.1,
+        "begin_frame": 0,
+        "end_frame": 0,
+    }
 
     details_response = client.get(
         f"/dataset/{dataset_object_id}/details",

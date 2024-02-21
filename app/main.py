@@ -1,5 +1,6 @@
 import boto3
 import dotenv
+import json
 import os
 
 from fastapi import (
@@ -42,6 +43,8 @@ class Label(BaseModel):
 class Node(BaseModel):
     left: float
     top: float
+    begin_frame: int
+    end_frame: int
 
 
 class Prediction(BaseModel):
@@ -53,6 +56,15 @@ class Prediction(BaseModel):
 class InferenceResponse(BaseModel):
     status: str
     predictions: list[Prediction]
+
+
+class TagRow(BaseModel):
+    tag_guid: UUID | None
+    tag: str
+
+
+class Tag(BaseModel):
+    tag: str
 
 
 mimetypes_init()
@@ -279,6 +291,10 @@ def dataset_file_add_label(
     label: Annotated[str, Form(...)],
     polygon: Annotated[str, Form(...)],
 ):
+    """Add a label to a file in the dataset. The polygon is a JSON string with a list of nodes in the form of {"left": 0.0, "top": 0.0, "begin_frame": 0, "end_frame": 0}.
+    The begin_frame and end_frame are the frame numbers where the polygon starts and ends in a video, for images they are both 0. Left and top are represented as a
+    percentage of the width and height of the image or video.
+    """
     with SessionLocal() as session:
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
         file_result = session.execute(file_query).one_or_none()
@@ -288,6 +304,27 @@ def dataset_file_add_label(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="File not found",
         )
+
+    try:
+        polygon_parsed = json.loads(polygon)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid polygon",
+        )
+
+    for node in polygon_parsed:
+        if "left" not in node or "top" not in node:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid polygon: missing left or top",
+            )
+
+        if "begin_frame" not in node or "end_frame" not in node:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid polygon: missing begin_frame or end_frame",
+            )
 
     with SessionLocal() as session:
         label_guid = uuid4()
@@ -307,7 +344,7 @@ def dataset_file_add_label(
         "label": {
             "label_guid": label_guid,
             "label": label,
-            "polygon": polygon,
+            "polygon": polygon_parsed,
         },
     }
 
@@ -383,6 +420,27 @@ def dataset_file_update_label(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Label not found",
         )
+
+    try:
+        polygon_parsed = json.loads(polygon)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid polygon",
+        )
+
+    for node in polygon_parsed:
+        if "left" not in node or "top" not in node:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid polygon: missing left or top",
+            )
+
+        if "begin_frame" not in node or "end_frame" not in node:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid polygon: missing begin_frame or end_frame",
+            )
 
     with SessionLocal() as session:
         session.execute(
@@ -707,26 +765,76 @@ def model_file_inference(
                 "label": "crack",
                 "confidence": 0.9,
                 "polygon": [
-                    {"left": 0.8072916666666666, "top": 0.24825581395348836},
-                    {"left": 0.7291666666666666, "top": 0.2802325581395349},
-                    {"left": 0.7113715277777778, "top": 0.45058139534883723},
-                    {"left": 0.7035590277777778, "top": 0.6186046511627907},
-                    {"left": 0.8229166666666666, "top": 0.6546511627906977},
-                    {"left": 0.8919270833333334, "top": 0.6343023255813953},
-                    {"left": 0.9088541666666666, "top": 0.5238372093023256},
-                    {"left": 0.9123263888888888, "top": 0.37209302325581395},
-                    {"left": 0.8940972222222222, "top": 0.2744186046511628},
-                    {"left": 0.8441840277777778, "top": 0.2558139534883721},
+                    {
+                        "left": 0.8072916666666666,
+                        "top": 0.24825581395348836,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.7291666666666666,
+                        "top": 0.2802325581395349,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.7113715277777778,
+                        "top": 0.45058139534883723,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.7035590277777778,
+                        "top": 0.6186046511627907,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.8229166666666666,
+                        "top": 0.6546511627906977,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.8919270833333334,
+                        "top": 0.6343023255813953,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.9088541666666666,
+                        "top": 0.5238372093023256,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.9123263888888888,
+                        "top": 0.37209302325581395,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.8940972222222222,
+                        "top": 0.2744186046511628,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
+                    {
+                        "left": 0.8441840277777778,
+                        "top": 0.2558139534883721,
+                        "begin_frame": 0,
+                        "end_frame": 0,
+                    },
                 ],
             },
             {
                 "label": "crack",
                 "confidence": 0.4,
                 "polygon": [
-                    {"left": 0.10, "top": 0.10},
-                    {"left": 0.20, "top": 0.10},
-                    {"left": 0.20, "top": 0.20},
-                    {"left": 0.10, "top": 0.20},
+                    {"left": 0.10, "top": 0.10, "begin_frame": 0, "end_frame": 0},
+                    {"left": 0.20, "top": 0.10, "begin_frame": 0, "end_frame": 0},
+                    {"left": 0.20, "top": 0.20, "begin_frame": 0, "end_frame": 0},
+                    {"left": 0.10, "top": 0.20, "begin_frame": 0, "end_frame": 0},
                 ],
             },
         ],
