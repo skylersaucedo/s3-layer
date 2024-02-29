@@ -15,6 +15,7 @@ import httpx
 mimetypes.init()
 from fastapi import Response
 import json
+import requests
 # API_ROOT = os.environ["API_ROOT"]
 # API_KEY = os.environ["API_KEY"]
 # API_SECRET = os.environ["API_SECRET"]
@@ -110,16 +111,21 @@ def get_uploaded_files():
 
 def upload_tag_to_api(file_guid, tag):
     """send tag to endpoint. Tag must be string"""
+    tag_url = f"{API_ROOT}/dataset/{file_guid}/tags"
     tag_details_response = httpx.post(
-        f"{API_ROOT}/dataset/{file_guid}/tags",
+        tag_url,
         files={"tag": tag},
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
 
-    tag_details = tag_details_response.json() 
+    r = requests.post(url=tag_url, params=tag, auth=(API_KEY, API_SECRET))
 
-    print('tag details: ', tag_details)
+    print('tag response: ',r.json())
+
+
+    # tag_details = tag_details_response.json() 
+    # print('tag details: ', tag_details)
 
     # if tag_details.status_code != 200:
     #     print("Something happened", tag_details.status_code)
@@ -135,6 +141,8 @@ def send_label_to_api(file_guid, label, defect_response):
     label_details_response = httpx.post(
         f"{API_ROOT}/dataset/{file_guid}/labels",
         files={"label": label, "polygon":defect_response},
+        #files=defect_response,
+
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
@@ -184,6 +192,7 @@ def main():
 
                     # send tag here, starting with 1st dataset
 
+                    #tag_string = json.dumps("RetinaNet-POC")
                     tag_string = "RetinaNet-POC"
 
                     tag_out = upload_tag_to_api(file_guid, tag_string)
@@ -200,8 +209,17 @@ def main():
                         ymin = float(row['ymin_n'])
                         ymax = float(row['ymax_n'])
                     
+                        # pac = {
+                        #     "label": label, 
+                        #     "polygon": [
+                        #         {"x": xmin, "y": ymin}, 
+                        #         {"x": xmax, "y": ymin},  
+                        #         {"x": xmax, "y": ymax},  
+                        #         {"x": xmin, "y": ymax}
+                        #         ]
+                        #     }
+                        
                         pac = {
-                            "label": label, 
                             "polygon": [
                                 {"x": xmin, "y": ymin}, 
                                 {"x": xmax, "y": ymin},  
@@ -211,6 +229,8 @@ def main():
                             }
                         
                         packet = json.dumps(pac)
+
+                        
 
                         # packet = {
                         #     "label": label, 
