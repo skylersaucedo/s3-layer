@@ -57,6 +57,29 @@ class DatasetObject(Base):
     def __str__(self):
         return f"<Dataset(name={self.name}, s3_object_name={self.s3_object_name}>"
 
+    @classmethod
+    def clean_polygons(cls, polygon_list: list[dict]) -> list[dict]:
+        clean_list = []
+
+        for polygon in polygon_list:
+            x = polygon.get("x", None)
+            y = polygon.get("y", None)
+
+            if x is None and "left" in polygon:
+                x = polygon["left"]
+
+            if y is None and "top" in polygon:
+                y = polygon["top"]
+
+            clean_polygon = {
+                "x": x,
+                "y": y,
+            }
+
+            clean_list.append(clean_polygon)
+
+        return clean_list
+
     def as_dict(self, session):
         return {
             "id": self.id,
@@ -78,7 +101,9 @@ class DatasetObject(Base):
                     {
                         "label_guid": l[0].id,
                         "label": l[0].label,
-                        "polygon": json.loads(l[0].polygon or "[]"),
+                        "polygon": DatasetObject.clean_polygons(
+                            json.loads(l[0].polygon or "[]")
+                        ),
                     }
                     for l in self.labels(session)
                 ],
