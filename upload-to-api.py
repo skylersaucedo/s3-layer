@@ -12,7 +12,14 @@ from hashlib import md5
 import mimetypes
 import httpx
 mimetypes.init()
-API_ROOT = os.environ["API_ROOT"]
+
+# API_ROOT = os.environ["API_ROOT"]
+# API_KEY = os.environ["API_KEY"]
+# API_SECRET = os.environ["API_SECRET"]
+
+API_ROOT = "https://api.tsi-mlops.com"
+API_KEY = "cgzax4Kogqk7"
+API_SECRET = "mvCRjIkRK4CK2Zhqw4rsiF0wBmD4Ir"
 
 """useful functions"""
 
@@ -74,7 +81,7 @@ def upload_to_api(file_name, file_stream, file_mimetype):
     file_details_response = httpx.post(
         f"{API_ROOT}/dataset",
         files={"file": (file_name, file_stream, file_mimetype)},
-        auth=(os.environ["API_KEY"], os.environ["API_SECRET"]),
+        auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
 
@@ -97,8 +104,51 @@ def get_uploaded_files():
     json_response = list_response.json()
 
     return json_response["files"]
-def main():
+
+
+def upload_tag_to_api(file_guid, tag):
+    """send tag to endpoint. Tag must be string"""
+    tag_details_response = httpx.post(
+        f"{API_ROOT}/{file_guid}/tags",
+        files={"tag": tag},
+        auth=(API_KEY, API_SECRET),
+        timeout=600.0,
+    )
+
+    tag_details = tag_details_response.json() 
+
+    print('tag details: ', tag_details)
+
+    # if tag_details.status_code != 200:
+    #     print("Something happened", tag_details.status_code)
+    #     return tag_details.status_code
+
+    # else:
+    #     return tag_details.status_code
     
+
+def send_label_to_api(file_guid, label, defect_response):
+    """send polygon data to api"""
+
+    label_details_response = httpx.post(
+        f"{API_ROOT}/dataset/{file_guid}/labels",
+        files={"label": label, "polygon":defect_response},
+        auth=(API_KEY, API_SECRET),
+        timeout=600.0,
+    )
+
+    tag_details = label_details_response.json() 
+
+    if label_details_response.status_code != 200:
+        print("Something happened", label_details_response.status_code)
+        return label_details_response.status_code
+
+    else:
+        return label_details_response.status_code
+
+def main():
+    image_cache = []
+
     upload_count = 0
     combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
     df_f = pd.DataFrame(columns=['image_path', 'h', 'w', 'c', 'defect', 'xmin_n', 'ymin_n','xmax_n','ymax_n'])
@@ -118,15 +168,55 @@ def main():
                 df = grab_defect_data(image_path, xml_path)
 
                 # # --- add image to API here -----
-                # with open(image_path, "rb") as f:
-                #     file_hash = md5(f.read()).hexdigest()
+                with open(image_path, "rb") as f:
+                    file_hash = md5(f.read()).hexdigest()
 
-                #     file_mimetype = mimetypes.guess_type(image_path)[0]
-                #     print(f"File mimetype: {file_mimetype}")
-                #     file_guid = upload_to_api(image_path, f, file_mimetype)
-                #     print(f"Uploaded {image_path} as {file_guid}")
-                #     image_path.append(file_hash)
-                #     upload_count += 1
+                    file_mimetype = mimetypes.guess_type(image_path)[0]
+                    print(f"File mimetype: {file_mimetype}")
+                    file_guid = upload_to_api(image_path, f, file_mimetype)
+                    print(f"Uploaded {image_path} as {file_guid}")
+                    image_cache.append(file_hash)
+                    upload_count += 1
+
+                    # send tag here, starting with 1st dataset
+
+                    tag_string = "RetinaNet-POC"
+
+                    tag_out = upload_tag_to_api(file_guid, tag_string)
+
+                    print('tag status upload: ', tag_out)
+
+                    ## -- Add each defect associated with each unique image
+                    
+                    for index, row in df_f.iterrows():
+                        # cycle through each defect
+                        label = row['defect']
+                        xmin = float(row['xmin_n'])
+                        xmax = float(row['xmax_n'])
+                        ymin = float(row['ymin_n'])
+                        ymax = float(row['ymax_n'])
+                    
+                        defect_response = {
+                            
+                            "label": label, 
+                            "polygon": [
+                                {"x": xmin, "y": ymin}, 
+                                {"x": xmax, "y": ymin},  
+                                {"x": xmax, "y": ymax},  
+                                {"x": xmin, "y": ymax}
+                                ]
+                            }
+                        
+
+                        # send label
+
+                        send_label_to_api(file_guid, label, defect_response)
+
+
+
+
+                    
+
 
                 ## add json bounding box info
 
