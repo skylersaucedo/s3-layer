@@ -223,9 +223,8 @@ def dataset_file_add_label(
     label: Annotated[str, Form(...)],
     polygon: Annotated[str, Form(...)],
 ):
-    """Add a label to a file in the dataset. The polygon is a JSON string with a list of nodes in the form of {"left": 0.0, "top": 0.0, "begin_frame": 0, "end_frame": 0}.
-    The begin_frame and end_frame are the frame numbers where the polygon starts and ends in a video, for images they are both 0. Left and top are represented as a
-    percentage of the width and height of the image or video.
+    """Add a label to a file in the dataset. The polygon is a JSON string with a list of nodes in the form of {"x": 0.0, "y": 0.0}.
+    X and Y are represented as a percentage of the width and height of the image or video.
     """
     with SessionLocal() as session:
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
@@ -246,16 +245,16 @@ def dataset_file_add_label(
         )
 
     for node in polygon_parsed:
-        if "left" not in node or "top" not in node:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid polygon: missing left or top",
-            )
+        if "left" in node:
+            node["x"] = node["left"]
 
-        if "begin_frame" not in node or "end_frame" not in node:
+        if "top" in node:
+            node["y"] = node["top"]
+
+        if "x" not in node or "y" not in node:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid polygon: missing begin_frame or end_frame",
+                detail="Invalid polygon: missing x or y",
             )
 
     with SessionLocal() as session:
@@ -360,16 +359,16 @@ def dataset_file_update_label(
         )
 
     for node in polygon_parsed:
-        if "left" not in node or "top" not in node:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid polygon: missing left or top",
-            )
+        if "left" in node:
+            node["x"] = node["left"]
 
-        if "begin_frame" not in node or "end_frame" not in node:
+        if "top" in node:
+            node["y"] = node["top"]
+
+        if "x" not in node or "y" not in node:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid polygon: missing begin_frame or end_frame",
+                detail="Invalid polygon: missing x or y",
             )
 
     with SessionLocal() as session:
