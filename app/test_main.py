@@ -326,8 +326,8 @@ def test_dataset_file_add_label():
             "label": "test label",
             "polygon": json.dumps(
                 [
-                    {"left": 0.1, "top": 0.1, "begin_frame": 0, "end_frame": 0},
-                    {"left": 0.9, "top": 0.1, "begin_frame": 0, "end_frame": 0},
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.9, "y": 0.1},
                 ]
             ),
         },
@@ -342,16 +342,12 @@ def test_dataset_file_add_label():
     assert len(add_label_response_json["label"]["polygon"]) == 2
 
     assert add_label_response_json["label"]["polygon"][0] == {
-        "left": 0.1,
-        "top": 0.1,
-        "begin_frame": 0,
-        "end_frame": 0,
+        "x": 0.1,
+        "y": 0.1,
     }
     assert add_label_response_json["label"]["polygon"][1] == {
-        "left": 0.9,
-        "top": 0.1,
-        "begin_frame": 0,
-        "end_frame": 0,
+        "x": 0.9,
+        "y": 0.1,
     }
 
     details_response = client.get(
@@ -395,16 +391,12 @@ def test_dataset_file_delete_label():
             "polygon": json.dumps(
                 [
                     {
-                        "left": 0.1,
-                        "top": 0.1,
-                        "begin_frame": 0,
-                        "end_frame": 0,
+                        "x": 0.1,
+                        "y": 0.1,
                     },
                     {
-                        "left": 0.9,
-                        "top": 0.1,
-                        "begin_frame": 0,
-                        "end_frame": 0,
+                        "x": 0.9,
+                        "y": 0.1,
                     },
                 ]
             ),
@@ -420,16 +412,12 @@ def test_dataset_file_delete_label():
     assert len(add_label_response_json["label"]["polygon"]) == 2
 
     assert add_label_response_json["label"]["polygon"][0] == {
-        "left": 0.1,
-        "top": 0.1,
-        "begin_frame": 0,
-        "end_frame": 0,
+        "x": 0.1,
+        "y": 0.1,
     }
     assert add_label_response_json["label"]["polygon"][1] == {
-        "left": 0.9,
-        "top": 0.1,
-        "begin_frame": 0,
-        "end_frame": 0,
+        "x": 0.9,
+        "y": 0.1,
     }
 
     details_response = client.get(
