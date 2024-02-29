@@ -1,5 +1,6 @@
 """
 using this to upload images to endpoint
+potentially working
 """
 
 import os
@@ -229,12 +230,6 @@ def main():
 
                         #send_label_to_api(file_guid, label, defect_response)
                         send_label_to_api(file_guid, label, packet)
-
-
-
-
-                    
-
 
                 ## add json bounding box info
 
