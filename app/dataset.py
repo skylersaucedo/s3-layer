@@ -24,14 +24,14 @@ from .db.models import (
     DatasetObjectLabel,
     DatasetObjectTag,
 )
-from .types import BasicResponse
+from .types import BasicResponse, UploadFileResponse, DatasetFileDetails
 
 
 def dataset_upload_file(
     file: Annotated[UploadFile, File(...)],
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     tags: Annotated[list[str], Form(...)] = None,
-):
+) -> UploadFileResponse:
     s3 = boto3.client("s3")
 
     file_name = file.filename
@@ -395,7 +395,7 @@ def dataset_file_update_label(
 def dataset_file_details(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
-):
+) -> DatasetFileDetails:
     with SessionLocal() as session:
         file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
         file_result = session.execute(file_query).one_or_none()

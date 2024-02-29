@@ -12,10 +12,7 @@ from mimetypes import init as mimetypes_init
 from typing import Annotated
 
 from .auth import authenticate_user
-from .types import (
-    BasicResponse,
-    InferenceResponse,
-)
+from .types import BasicResponse, InferenceResponse, UploadFileResponse
 from .dataset import (
     dataset_upload_file,
     dataset_list_files,
@@ -75,6 +72,7 @@ app.add_api_route(
     methods=["POST"],
     summary="Upload file to the S3 dataset.",
     description=dataset_upload_file.__doc__,
+    response_model=UploadFileResponse,
 )
 
 app.add_api_route(

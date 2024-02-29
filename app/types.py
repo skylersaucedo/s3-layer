@@ -6,9 +6,15 @@ class BasicResponse(BaseModel):
     status: str
 
 
+class Point(BaseModel):
+    x: float
+    y: float
+
+
 class Label(BaseModel):
+    label_guid: UUID | None
     label: str
-    polygon: str
+    polygon: list[Point]
 
 
 class Node(BaseModel):
@@ -29,10 +35,26 @@ class InferenceResponse(BaseModel):
     predictions: list[Prediction]
 
 
-class TagRow(BaseModel):
+class Tag(BaseModel):
     tag_guid: UUID | None
     tag: str
 
 
-class Tag(BaseModel):
-    tag: str
+class UploadFileResponse(BaseModel):
+    status: str
+    s3_object_name: str
+    dataset_object_id: UUID
+
+
+class DatasetFile(BaseModel):
+    id: UUID
+    name: str
+    s3_object_name: str
+    content_type: str
+    tags: list[Tag]
+    labels: list[Label]
+
+
+class DatasetFileDetails(BaseModel):
+    status: str
+    file: DatasetFile
