@@ -247,9 +247,11 @@ def dataset_file_add_label(
     for node in polygon_parsed:
         if "left" in node:
             node["x"] = node["left"]
+            node.pop("left")
 
         if "top" in node:
             node["y"] = node["top"]
+            node.pop("top")
 
         if "x" not in node or "y" not in node:
             raise HTTPException(
@@ -361,9 +363,11 @@ def dataset_file_update_label(
     for node in polygon_parsed:
         if "left" in node:
             node["x"] = node["left"]
+            node.pop("left")
 
         if "top" in node:
             node["y"] = node["top"]
+            node.pop("top")
 
         if "x" not in node or "y" not in node:
             raise HTTPException(
