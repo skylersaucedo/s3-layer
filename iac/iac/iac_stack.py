@@ -162,7 +162,7 @@ class IacStack(Stack):
             domain_zone=hosted_zone,
             listener_port=443,
             # load_balancer_name="tubesml-api-lb",
-            memory_limit_mib=1024,  # Default is 512
+            memory_limit_mib=2048,  # Default is 512
             public_load_balancer=True,
             redirect_http=True,
             service_name="tubesml-api",
