@@ -12,6 +12,7 @@ from hashlib import md5
 import mimetypes
 import httpx
 mimetypes.init()
+from fastapi import Response
 
 # API_ROOT = os.environ["API_ROOT"]
 # API_KEY = os.environ["API_KEY"]
@@ -137,7 +138,7 @@ def send_label_to_api(file_guid, label, defect_response):
         timeout=600.0,
     )
 
-    tag_details = label_details_response.json() 
+    label_details_response = label_details_response.json() 
 
     if label_details_response.status_code != 200:
         print("Something happened", label_details_response.status_code)
@@ -196,17 +197,29 @@ def main():
                         ymin = float(row['ymin_n'])
                         ymax = float(row['ymax_n'])
                     
-                        defect_response = {
-                            
+                        # packet = {
+                        #     "label": label, 
+                        #     "polygon": [
+                        #         {"x": xmin, "y": ymin}, 
+                        #         {"x": xmax, "y": ymin},  
+                        #         {"x": xmax, "y": ymax},  
+                        #         {"x": xmin, "y": ymax}
+                        #         ]
+                        #     }
+
+                        packet = {
                             "label": label, 
                             "polygon": [
-                                {"x": xmin, "y": ymin}, 
-                                {"x": xmax, "y": ymin},  
-                                {"x": xmax, "y": ymax},  
-                                {"x": xmin, "y": ymax}
+                                (xmin, ymin), 
+                                (xmax, ymin),  
+                                (xmax, ymax),  
+                                (xmin, ymax)
                                 ]
                             }
-                        
+
+                        # see if this works...
+
+                        defect_response = Response(content=packet, media_type="application/json")
 
                         # send label
 
