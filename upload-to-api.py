@@ -1,6 +1,5 @@
 """
 using this to upload images to endpoint
-potentially working
 """
 
 import os
@@ -13,16 +12,13 @@ from hashlib import md5
 import mimetypes
 import httpx
 mimetypes.init()
-from fastapi import Response
-import json
-import requests
-# API_ROOT = os.environ["API_ROOT"]
-# API_KEY = os.environ["API_KEY"]
-# API_SECRET = os.environ["API_SECRET"]
+from dotenv import load_dotenv
 
-API_ROOT = "https://api.tsi-mlops.com"
-API_KEY = "cgzax4Kogqk7"
-API_SECRET = "mvCRjIkRK4CK2Zhqw4rsiF0wBmD4Ir"
+load_dotenv()
+
+API_ROOT = os.environ["API_ROOT"]
+API_KEY = os.environ["API_KEY"]
+API_SECRET = os.environ["API_SECRET"]
 
 """useful functions"""
 
@@ -95,7 +91,6 @@ def upload_to_api(file_name, file_stream, file_mimetype):
 
     return file_details["dataset_object_id"]
 
-
 ## make sure we dont upload twice!
 
 def get_uploaded_files():
@@ -105,7 +100,6 @@ def get_uploaded_files():
     )
 
     json_response = list_response.json()
-
     return json_response["files"]
 
 
@@ -123,36 +117,9 @@ def upload_tag_to_api(file_guid, tag):
         timeout=600.0,
     )
 
-    #r = requests.post(url=tag_url, params=tag, auth=(API_KEY, API_SECRET))
     out = tag_details_response.json() 
-
-
     print('tag response: ',out)
     
-
-    # tag_details = tag_details_response.json() 
-    # print('tag details: ', tag_details)
-
-    # if tag_details.status_code != 200:
-    #     print("Something happened", tag_details.status_code)
-    #     return tag_details.status_code
-
-    # else:
-    #     return tag_details.status_code
-    
-    #url = "https://api.tsi-mlops.com/dataset/d613f56b-f9f6-4274-bd72-e59f22b5f79a/tags"
-
-    # payload = {'tag': 'trying'}
-    # files=[]
-    # headers = {
-    # 'Authorization': 'Basic Y2d6YXg0S29ncWs3Om12Q1JqSWtSSzRDSzJaaHF3NHJzaUYwd0JtRDRJcg=='
-    # }
-
-    # response = requests.request("POST", url, headers=headers, data=payload, files=files)
-
-    # print(response.text)
-    
-
 def send_label_to_api(file_guid, label, defect_response):
     """send polygon data to api"""
 
@@ -167,22 +134,13 @@ def send_label_to_api(file_guid, label, defect_response):
 
     label_details_response = label_details_response.json() 
 
-    # if label_details_response.status_code != 200:
-    #     print("Something happened", label_details_response.status_code)
-    #     return label_details_response.status_code
-
-    # else:
-    #     return label_details_response.status_code
-
     print('send label to api: ', label_details_response)
 
 def main():
     image_cache = []
 
-    upload_count = 0
-    #combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
-    
-    combined_folder = r"C:\Users\Administrator\Desktop\defect-detection\TSI  -object-detection-pytorch-wandb-coco\data\combined"
+    combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
+    #combined_folder = r"C:\Users\Administrator\Desktop\defect-detection\TSI  -object-detection-pytorch-wandb-coco\data\combined"
     df_f = pd.DataFrame(columns=['image_path', 'h', 'w', 'c', 'defect', 'xmin_n', 'ymin_n','xmax_n','ymax_n'])
 
     for filename in os.listdir(combined_folder):
@@ -208,18 +166,13 @@ def main():
                     file_guid = upload_to_api(image_path, f, file_mimetype)
                     print(f"Uploaded {image_path} as {file_guid}")
                     image_cache.append(file_hash)
-                    upload_count += 1
 
-                    # send tag here, starting with 1st dataset
-
-                    #tag_string = json.dumps("RetinaNet-POC")
                     tag_string = "RetinaNet-POC"
-                    
                     upload_tag_to_api(file_guid, tag_string)
 
                     ## -- Add each defect associated with each unique image
                     
-                    for index, row in df_f.iterrows():
+                    for index, row in df.iterrows():
                         # cycle through each defect
                         label = row['defect']
                         xmin = float(row['xmin_n'])
@@ -227,31 +180,11 @@ def main():
                         ymin = float(row['ymin_n'])
                         ymax = float(row['ymax_n'])
                         
-                        #payload = '[{"x": {xmin}, "y":{ymin}},{"x":{xmax}, "y":{ymin}},{"x":{xmax}, "y":{ymax}},{"x":{xmin}, "y":{ymax}}]'
                         payload = '[{"x":' + str(xmin) + ', "y":' + str(ymin) + '},{"x":' + str(xmax) +', "y":'+str(ymin) + '},{"x":' + str(xmax) + ', "y":' + str(ymax) + '},{"x":' + str(xmin) + ', "y":' + str(ymax) + '}]'
 
                         print('payload: ', payload)
 
-                        # packet = {
-                        #     "label": label, 
-                        #     "polygon": [
-                        #         (xmin, ymin), 
-                        #         (xmax, ymin),  
-                        #         (xmax, ymax),  
-                        #         (xmin, ymax)
-                        #         ]
-                        #     }
-
-                        # see if this works...
-
-                        #defect_response = Response(content=packet, media_type="application/json")
-
-                        # send label
-
-                        #send_label_to_api(file_guid, label, defect_response)
                         send_label_to_api(file_guid, label, payload)
-
-                ## add json bounding box info
 
                 # combine final dataframe
                 df_f = pd.concat([df_f, df],ignore_index=True)
@@ -260,6 +193,7 @@ def main():
                 print(f"Skipping {filename}: No associated .xml file found.")
 
     print("Defect plots generated successfully!")
+    df_f.to_csv('images-uploaded-to-s3.csv')
     print(df_f)
 
 
