@@ -112,17 +112,23 @@ def get_uploaded_files():
 def upload_tag_to_api(file_guid, tag):
     """send tag to endpoint. Tag must be string"""
     tag_url = f"{API_ROOT}/dataset/{file_guid}/tags"
+    
+    payload = {'tag': tag}
+
+    
     tag_details_response = httpx.post(
         tag_url,
-        data={"tag": tag["tag"]},
+        data=payload,
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
 
-    r = requests.post(url=tag_url, params=tag, auth=(API_KEY, API_SECRET))
+    #r = requests.post(url=tag_url, params=tag, auth=(API_KEY, API_SECRET))
+    out = tag_details_response.json() 
 
-    print('tag response: ',r.json())
 
+    print('tag response: ',out)
+    
 
     # tag_details = tag_details_response.json() 
     # print('tag details: ', tag_details)
@@ -134,13 +140,25 @@ def upload_tag_to_api(file_guid, tag):
     # else:
     #     return tag_details.status_code
     
+    #url = "https://api.tsi-mlops.com/dataset/d613f56b-f9f6-4274-bd72-e59f22b5f79a/tags"
+
+    # payload = {'tag': 'trying'}
+    # files=[]
+    # headers = {
+    # 'Authorization': 'Basic Y2d6YXg0S29ncWs3Om12Q1JqSWtSSzRDSzJaaHF3NHJzaUYwd0JtRDRJcg=='
+    # }
+
+    # response = requests.request("POST", url, headers=headers, data=payload, files=files)
+
+    # print(response.text)
+    
 
 def send_label_to_api(file_guid, label, defect_response):
     """send polygon data to api"""
 
     label_details_response = httpx.post(
         f"{API_ROOT}/dataset/{file_guid}/labels",
-        data={"label": label["label"], "polygon":defect_response},
+        data={"label": label, "polygon":[defect_response]},
         #files=defect_response,
 
         auth=(API_KEY, API_SECRET),
@@ -162,7 +180,9 @@ def main():
     image_cache = []
 
     upload_count = 0
-    combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
+    #combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
+    
+    combined_folder = r"C:\Users\Administrator\Desktop\defect-detection\TSI  -object-detection-pytorch-wandb-coco\data\combined"
     df_f = pd.DataFrame(columns=['image_path', 'h', 'w', 'c', 'defect', 'xmin_n', 'ymin_n','xmax_n','ymax_n'])
 
     for filename in os.listdir(combined_folder):
@@ -194,10 +214,8 @@ def main():
 
                     #tag_string = json.dumps("RetinaNet-POC")
                     tag_string = "RetinaNet-POC"
-
-                    tag_out = upload_tag_to_api(file_guid, tag_string)
-
-                    print('tag status upload: ', tag_out)
+                    
+                    upload_tag_to_api(file_guid, tag_string)
 
                     ## -- Add each defect associated with each unique image
                     
@@ -208,29 +226,11 @@ def main():
                         xmax = float(row['xmax_n'])
                         ymin = float(row['ymin_n'])
                         ymax = float(row['ymax_n'])
-                    
-                        # pac = {
-                        #     "label": label, 
-                        #     "polygon": [
-                        #         {"x": xmin, "y": ymin}, 
-                        #         {"x": xmax, "y": ymin},  
-                        #         {"x": xmax, "y": ymax},  
-                        #         {"x": xmin, "y": ymax}
-                        #         ]
-                        #     }
                         
-                        pac = {
-                            "polygon": [
-                                {"x": xmin, "y": ymin}, 
-                                {"x": xmax, "y": ymin},  
-                                {"x": xmax, "y": ymax},  
-                                {"x": xmin, "y": ymax}
-                                ]
-                            }
-                        
-                        packet = json.dumps(pac)
+                        #payload = '[{"x": {xmin}, "y":{ymin}},{"x":{xmax}, "y":{ymin}},{"x":{xmax}, "y":{ymax}},{"x":{xmin}, "y":{ymax}}]'
+                        payload = '[{"x":' + str(xmin) + ', "y":' + str(ymin) + '},{"x":' + str(xmax) +', "y":'+str(ymin) + '},{"x":' + str(xmax) + ', "y":' + str(ymax) + '},{"x":' + str(xmin) + ', "y":' + str(ymax) + '}]'
 
-                        
+                        print('payload: ', payload)
 
                         # packet = {
                         #     "label": label, 
@@ -249,7 +249,7 @@ def main():
                         # send label
 
                         #send_label_to_api(file_guid, label, defect_response)
-                        send_label_to_api(file_guid, label, pac)
+                        send_label_to_api(file_guid, label, payload)
 
                 ## add json bounding box info
 
