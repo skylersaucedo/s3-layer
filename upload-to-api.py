@@ -114,7 +114,7 @@ def upload_tag_to_api(file_guid, tag):
     tag_url = f"{API_ROOT}/dataset/{file_guid}/tags"
     tag_details_response = httpx.post(
         tag_url,
-        files={"tag": tag},
+        data={"tag": tag["tag"]},
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
@@ -140,7 +140,7 @@ def send_label_to_api(file_guid, label, defect_response):
 
     label_details_response = httpx.post(
         f"{API_ROOT}/dataset/{file_guid}/labels",
-        files={"label": label, "polygon":defect_response},
+        data={"label": label["label"], "polygon":defect_response},
         #files=defect_response,
 
         auth=(API_KEY, API_SECRET),
@@ -249,7 +249,7 @@ def main():
                         # send label
 
                         #send_label_to_api(file_guid, label, defect_response)
-                        send_label_to_api(file_guid, label, packet)
+                        send_label_to_api(file_guid, label, pac)
 
                 ## add json bounding box info
 
