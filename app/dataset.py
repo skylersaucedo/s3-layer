@@ -1,4 +1,5 @@
 import boto3
+import hashlib
 import json
 import os
 
@@ -24,7 +25,12 @@ from .db.models import (
     DatasetObjectLabel,
     DatasetObjectTag,
 )
-from .types import BasicResponse, UploadFileResponse, DatasetFileDetails
+from .types import (
+    BasicResponse,
+    UploadFileResponse,
+    DatasetFileDetails,
+    ListFilesResponse,
+)
 
 
 def dataset_upload_file(
@@ -36,6 +42,17 @@ def dataset_upload_file(
 
     file_name = file.filename
     content_type, encoding = guess_type(file.filename)
+
+    # calculate the file's sha1 hash
+    sha1 = hashlib.sha1()
+
+    while True:
+        data = file.file.read(65536)
+        if not data:
+            break
+        sha1.update(data)
+
+    file.file.seek(0)
 
     s3_object_name = f"{uuid4()}-{file_name}"
 
@@ -52,6 +69,7 @@ def dataset_upload_file(
                 name=file_name,
                 s3_object_name=s3_object_name,
                 content_type=content_type,
+                file_hash_sha1=sha1.hexdigest(),
             )
         )
 
@@ -419,31 +437,23 @@ def dataset_file_details(
 def dataset_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     search_tags: Annotated[list[str], Form(...)] = None,
-):
+) -> ListFilesResponse:
     """List all files in the dataset."""
     with SessionLocal() as session:
         files_query = select(DatasetObject).order_by("name")
         files_result = session.execute(files_query).all()
 
-    files_list = []
-    search_tags_set = frozenset(search_tags) if search_tags else {}
+        files_list = []
+        search_tags_set = frozenset(search_tags) if search_tags else {}
 
-    for row in files_result:
-        file = row[0]  # DatasetObject is in the first element of the tuple
-        tags = frozenset([t[0].tag for t in file.tags(session=session)])
+        for row in files_result:
+            file = row[0]  # DatasetObject is in the first element of the tuple
+            tags = frozenset([t[0].tag for t in file.tags(session=session)])
 
-        if search_tags and len(tags.intersection(search_tags_set)) > 0:
-            continue
+            if search_tags and len(tags.intersection(search_tags_set)) > 0:
+                continue
 
-        files_list.append(
-            {
-                "id": file.id,
-                "name": file.name,
-                "s3_object_name": file.s3_object_name,
-                "content_type": file.content_type,
-                "tags": tags,
-            }
-        )
+            files_list.append(file.as_dict(session=session))
 
     return {
         "status": "OK",

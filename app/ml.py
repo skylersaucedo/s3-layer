@@ -23,13 +23,17 @@ from .types import Prediction, InferenceResponse
 from .db.engine import SessionLocal
 from .db.models import MLModelObject
 
+resnet_model = torchvision.models.get_model(
+    "retinanet_resnet50_fpn",
+)
+
+
+def preload_model():
+    return resnet_model.eval()
+
 
 def detect_defects(image_data: cv2.typing.MatLike, model_data) -> list[Prediction]:
     image_width, image_height = image_data.shape[:2]
-
-    resnet_model = torchvision.models.get_model(
-        "retinanet_resnet50_fpn",
-    )
 
     device = torch.device("cpu")
 
@@ -39,6 +43,7 @@ def detect_defects(image_data: cv2.typing.MatLike, model_data) -> list[Predictio
     CLASSES = ["scratch", "dent", "paint", "pit", "none"]
 
     resnet_model.eval()
+
     # sticking with the CPU for now
     #    model.cuda()
 

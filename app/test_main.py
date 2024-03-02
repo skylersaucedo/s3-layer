@@ -191,6 +191,7 @@ def test_dataset_file_details():
     assert details_response_json["file"]["id"] == dataset_object_id
     assert details_response_json["file"]["name"] == "test_file.csv"
     assert details_response_json["file"]["content_type"] == "application/vnd.ms-excel"
+    assert details_response_json["file"]["file_hash_sha1"] == "123456"
     assert details_response_json["file"]["tags"][0]["tag"] == "test"
     assert (
         details_response_json["file"]["s3_object_name"]

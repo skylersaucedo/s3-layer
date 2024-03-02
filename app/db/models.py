@@ -3,9 +3,10 @@ import json
 import os
 import uuid
 
+from sqlalchemy import select, String, Text, UUID, DateTime
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import Mapped
-from sqlalchemy import select, String, Text, UUID
+from sqlalchemy import sql
 
 
 from .engine import Base
@@ -50,6 +51,13 @@ class DatasetObject(Base):
     name: Mapped[str] = mapped_column(String(512))
     s3_object_name: Mapped[str] = mapped_column(String(512), unique=True, index=True)
     content_type = mapped_column(String(128))
+    upload_date = mapped_column(DateTime(timezone=True), server_default=sql.func.now())
+    modified_date = mapped_column(
+        DateTime(timezone=True), onupdate=sql.func.now(), default=sql.func.now()
+    )
+    file_hash_sha1 = mapped_column(
+        String(40)
+    )  # SHA1 hash of the file to prevent duplicates
 
     def __repr__(self):
         return f"<Dataset(name={self.name}, s3_object_name={self.s3_object_name}>"
@@ -86,6 +94,9 @@ class DatasetObject(Base):
             "name": self.name,
             "s3_object_name": self.s3_object_name,
             "content_type": self.content_type,
+            "upload_date": self.upload_date,
+            "modified_date": self.modified_date,
+            "file_hash_sha1": self.file_hash_sha1,
             "tags": sorted(
                 [
                     {

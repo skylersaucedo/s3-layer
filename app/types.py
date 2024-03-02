@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from uuid import UUID
 
+import datetime
+
 
 class BasicResponse(BaseModel):
     status: str
@@ -51,6 +53,9 @@ class DatasetFile(BaseModel):
     name: str
     s3_object_name: str
     content_type: str
+    upload_date: datetime.datetime
+    modified_date: datetime.datetime
+    file_hash_sha1: str
     tags: list[Tag]
     labels: list[Label]
 
@@ -58,3 +63,8 @@ class DatasetFile(BaseModel):
 class DatasetFileDetails(BaseModel):
     status: str
     file: DatasetFile
+
+
+class ListFilesResponse(BaseModel):
+    status: str
+    files: list[DatasetFile]
