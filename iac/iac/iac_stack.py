@@ -155,14 +155,14 @@ class IacStack(Stack):
             "tubesml-api-service",
             assign_public_ip=True,
             cluster=cluster,
-            cpu=512,
+            cpu=1024,
             certificate=certificate,
             desired_count=1,
             domain_name="api.tsi-mlops.com",
             domain_zone=hosted_zone,
             listener_port=443,
             # load_balancer_name="tubesml-api-lb",
-            memory_limit_mib=2048,  # Default is 512
+            memory_limit_mib=8192,  # Default is 512
             public_load_balancer=True,
             redirect_http=True,
             service_name="tubesml-api",
