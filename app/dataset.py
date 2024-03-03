@@ -60,10 +60,10 @@ def dataset_upload_file(
         file_query = select(DatasetObject).where(
             DatasetObject.file_hash_sha1 == sha1.hexdigest()
         )
-        file_result = session.execute(file_query).one_or_none()
+        file_result = session.execute(file_query).all()
 
-        if file_result:
-            file_object = file_result[0]
+        if len(file_result) > 0 and len(file_result[0]) > 0:
+            file_object = file_result[0][0]
 
             return {
                 "status": "error",

@@ -4,7 +4,7 @@ import io
 import json
 import os
 
-dotenv.load_dotenv()
+dotenv.load_dotenv(dotenv_path="test.env")
 
 from fastapi.testclient import TestClient
 from moto import mock_s3

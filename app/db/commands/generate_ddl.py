@@ -1,9 +1,4 @@
-import dotenv
-
-dotenv.load_dotenv()
-
-
-def main():
+def generate_ddl():
     from app.db.engine import engine
     from app.db.models import Base
 
@@ -11,4 +6,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import dotenv
+
+    dotenv.load_dotenv()
+
+    generate_ddl()
