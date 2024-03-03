@@ -468,8 +468,6 @@ def test_dataset_list_files():
     assert response.status_code == 200
     response_json = response.json()
 
-    print(response_json)
-
     assert response_json["status"] == "OK"
     assert len(response_json["files"]) == response_json["count"]
 
