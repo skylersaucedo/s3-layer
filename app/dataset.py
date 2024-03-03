@@ -52,7 +52,25 @@ def dataset_upload_file(
             break
         sha1.update(data)
 
+    # seek back to the beginning of the file
     file.file.seek(0)
+
+    # see if a file with this hash already exists
+    with SessionLocal() as session:
+        file_query = select(DatasetObject).where(
+            DatasetObject.file_hash_sha1 == sha1.hexdigest()
+        )
+        file_result = session.execute(file_query).one_or_none()
+
+        if file_result:
+            file_object = file_result[0]
+
+            return {
+                "status": "error",
+                "message": "File already exists",
+                "s3_object_name": file_object.s3_object_name,
+                "dataset_object_id": file_object.id,
+            }
 
     s3_object_name = f"{uuid4()}-{file_name}"
 
