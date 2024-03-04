@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import os
 import uuid
 
@@ -10,6 +11,8 @@ from sqlalchemy import sql
 
 
 from .engine import Base
+
+logger = logging.getLogger(__name__)
 
 
 class APICredentials(Base):
@@ -66,7 +69,28 @@ class DatasetObject(Base):
         return f"<Dataset(name={self.name}, s3_object_name={self.s3_object_name}>"
 
     @classmethod
+    def polygon_string_to_json(cls, polygon_string: str) -> list[dict]:
+        try:
+            polygon_list = json.loads(polygon_string)
+        except json.JSONDecodeError:
+            logger.error(f"Error decoding JSON string: {polygon_string}")
+            polygon_list = []
+        except TypeError:
+            logger.error(f"Error decoding JSON string: {polygon_string}")
+            polygon_list = []
+
+        return cls.clean_polygons(polygon_list)
+
+    @classmethod
     def clean_polygons(cls, polygon_list: list[dict]) -> list[dict]:
+        if polygon_list is None:
+            logger.error(f"Invalid polygon list: {polygon_list}")
+            return []
+
+        if type(polygon_list) is not list:
+            logger.error(f"Invalid polygon list: {polygon_list}")
+            return []
+
         clean_list = []
 
         for polygon in polygon_list:
@@ -112,8 +136,8 @@ class DatasetObject(Base):
                     {
                         "label_guid": l[0].id,
                         "label": l[0].label,
-                        "polygon": DatasetObject.clean_polygons(
-                            json.loads(l[0].polygon or "[]")
+                        "polygon": DatasetObject.polygon_string_to_json(
+                            l[0].polygon or "[]"
                         ),
                     }
                     for l in self.labels(session)

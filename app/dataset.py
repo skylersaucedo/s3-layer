@@ -1,6 +1,7 @@
 import boto3
 import hashlib
 import json
+import logging
 import os
 
 from fastapi import (
@@ -32,6 +33,9 @@ from .types import (
     DatasetFileDetails,
     ListFilesResponse,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def dataset_upload_file(
@@ -293,6 +297,7 @@ def dataset_file_add_label(
             )
 
     label_guid = uuid4()
+
     session.execute(
         insert(DatasetObjectLabel).values(
             id=label_guid,
