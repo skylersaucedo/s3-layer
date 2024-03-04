@@ -67,7 +67,7 @@ test.ipynb is a Jupyter notebook that contains examples of how to use the API.
 ## Deployment
 
 ```
-docker build -t tubesml-ui:latest .
+docker build -t tubesml-api:latest .
 docker tag tubesml-api:latest 533266972570.dkr.ecr.us-east-2.amazonaws.com/tubesml-api:latest
 docker push 533266972570.dkr.ecr.us-east-2.amazonaws.com/tubesml-api:latest
 ```
