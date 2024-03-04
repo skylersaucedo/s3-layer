@@ -1,2 +1,4 @@
 ./app/test_fixtures
+test_*.py
 __pycache__/
+*.env

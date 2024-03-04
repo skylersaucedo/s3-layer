@@ -3,7 +3,8 @@ using this to upload images to endpoint
 """
 
 import os
-import matplotlib.pyplot as plt
+
+# import matplotlib.pyplot as plt
 from PIL import Image
 import xml.etree.ElementTree as ET
 import numpy as np
@@ -11,6 +12,7 @@ import pandas as pd
 from hashlib import md5
 import mimetypes
 import httpx
+
 mimetypes.init()
 from dotenv import load_dotenv
 
@@ -21,6 +23,7 @@ API_KEY = os.environ["API_KEY"]
 API_SECRET = os.environ["API_SECRET"]
 
 """useful functions"""
+
 
 def read_xml(xml_path):
     """Reads the XML file and extracts bounding box coordinates for all defects."""
@@ -36,22 +39,29 @@ def read_xml(xml_path):
         defects.append((name, xmin, ymin, xmax, ymax))
     return defects
 
-def plot_defects_on_image(image_path, xml_path):
-    """QC Plots bounding boxes for all defects on the image."""
-    image = Image.open(image_path)
-    defects = read_xml(xml_path)
 
-    plt.imshow(image)
-    
-    for name, xmin, ymin, xmax, ymax in defects:
-        rect = plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
-                            linewidth=1, edgecolor="r", facecolor="none")
-        plt.gca().add_patch(rect)
-        plt.text(xmin, ymin, name, color="r", fontsize=8, backgroundcolor="white")
+# def plot_defects_on_image(image_path, xml_path):
+#     """QC Plots bounding boxes for all defects on the image."""
+#     image = Image.open(image_path)
+#     defects = read_xml(xml_path)
 
-    plt.title(f"Defects in {os.path.basename(image_path)}")
-    plt.axis("off")  # Hide axes
-    plt.show()
+#     plt.imshow(image)
+
+#     for name, xmin, ymin, xmax, ymax in defects:
+#         rect = plt.Rectangle(
+#             (xmin, ymin),
+#             xmax - xmin,
+#             ymax - ymin,
+#             linewidth=1,
+#             edgecolor="r",
+#             facecolor="none",
+#         )
+#         plt.gca().add_patch(rect)
+#         plt.text(xmin, ymin, name, color="r", fontsize=8, backgroundcolor="white")
+
+#     plt.title(f"Defects in {os.path.basename(image_path)}")
+#     plt.axis("off")  # Hide axes
+#     plt.show()
 
 
 def grab_defect_data(image_path, xml_path):
@@ -62,19 +72,33 @@ def grab_defect_data(image_path, xml_path):
     defects = read_xml(xml_path)
 
     h, w, c = np.shape(image)
-    
+
     for name, xmin, ymin, xmax, ymax in defects:
 
-        xmin_n = xmin/w
-        xmax_n = xmax/w
-        ymin_n = ymin/h
-        ymax_n = ymax/h
+        xmin_n = xmin / w
+        xmax_n = xmax / w
+        ymin_n = ymin / h
+        ymax_n = ymax / h
 
-        img_name = os.path.basename(image_path).split('/')[-1]
+        img_name = os.path.basename(image_path).split("/")[-1]
         defect_list.append([img_name, h, w, c, name, xmin_n, ymin_n, xmax_n, ymax_n])
 
-    df = pd.DataFrame(data=defect_list, columns=['image_path', 'h', 'w', 'c', 'defect', 'xmin_n', 'ymin_n','xmax_n','ymax_n'])
+    df = pd.DataFrame(
+        data=defect_list,
+        columns=[
+            "image_path",
+            "h",
+            "w",
+            "c",
+            "defect",
+            "xmin_n",
+            "ymin_n",
+            "xmax_n",
+            "ymax_n",
+        ],
+    )
     return df
+
 
 def upload_to_api(file_name, file_stream, file_mimetype):
     file_details_response = httpx.post(
@@ -84,14 +108,16 @@ def upload_to_api(file_name, file_stream, file_mimetype):
         timeout=600.0,
     )
 
-    file_details = file_details_response.json() 
+    file_details = file_details_response.json()
 
     if file_details_response.status_code != 200:
         print("Something happened", file_details_response.status_code)
 
     return file_details["dataset_object_id"]
 
+
 ## make sure we dont upload twice!
+
 
 def get_uploaded_files():
     list_response = httpx.get(
@@ -106,10 +132,9 @@ def get_uploaded_files():
 def upload_tag_to_api(file_guid, tag):
     """send tag to endpoint. Tag must be string"""
     tag_url = f"{API_ROOT}/dataset/{file_guid}/tags"
-    
-    payload = {'tag': tag}
 
-    
+    payload = {"tag": tag}
+
     tag_details_response = httpx.post(
         tag_url,
         data=payload,
@@ -117,31 +142,45 @@ def upload_tag_to_api(file_guid, tag):
         timeout=600.0,
     )
 
-    out = tag_details_response.json() 
-    print('tag response: ',out)
-    
+    out = tag_details_response.json()
+    print("tag response: ", out)
+
+
 def send_label_to_api(file_guid, label, defect_response):
     """send polygon data to api"""
 
     label_details_response = httpx.post(
         f"{API_ROOT}/dataset/{file_guid}/labels",
-        data={"label": label, "polygon":[defect_response]},
-        #files=defect_response,
-
+        data={"label": label, "polygon": [defect_response]},
+        # files=defect_response,
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
 
-    label_details_response = label_details_response.json() 
+    label_details_response = label_details_response.json()
 
-    print('send label to api: ', label_details_response)
+    print("send label to api: ", label_details_response)
+
 
 def main():
     image_cache = []
 
-    combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
-    #combined_folder = r"C:\Users\Administrator\Desktop\defect-detection\TSI  -object-detection-pytorch-wandb-coco\data\combined"
-    df_f = pd.DataFrame(columns=['image_path', 'h', 'w', 'c', 'defect', 'xmin_n', 'ymin_n','xmax_n','ymax_n'])
+    # combined_folder = r"C:\Users\endle\Desktop\object-detection-pytorch-wandb-coco\data\combined"
+    # combined_folder = r"C:\Users\Administrator\Desktop\defect-detection\TSI  -object-detection-pytorch-wandb-coco\data\combined"
+    combined_folder = r"C:\Users\sblac\Programming\tubes\object-detection-pytorch-wandb-coco\data\train2017"
+    df_f = pd.DataFrame(
+        columns=[
+            "image_path",
+            "h",
+            "w",
+            "c",
+            "defect",
+            "xmin_n",
+            "ymin_n",
+            "xmax_n",
+            "ymax_n",
+        ]
+    )
 
     for filename in os.listdir(combined_folder):
         print(filename)
@@ -149,10 +188,10 @@ def main():
             image_path = os.path.join(combined_folder, filename)
             xml_path = os.path.join(combined_folder, filename.replace(".bmp", ".xml"))
 
-            if os.path.exists(xml_path): # Check if the associated .xml file exists
+            if os.path.exists(xml_path):  # Check if the associated .xml file exists
 
-                #plot your defects on images here, double check overlay..its good.
-                #plot_defects_on_image(image_path, xml_path)
+                # plot your defects on images here, double check overlay..its good.
+                # plot_defects_on_image(image_path, xml_path)
 
                 # defects stored as dataframe here
                 df = grab_defect_data(image_path, xml_path)
@@ -171,29 +210,47 @@ def main():
                     upload_tag_to_api(file_guid, tag_string)
 
                     ## -- Add each defect associated with each unique image
-                    
+
                     for index, row in df.iterrows():
                         # cycle through each defect
-                        label = row['defect']
-                        xmin = float(row['xmin_n'])
-                        xmax = float(row['xmax_n'])
-                        ymin = float(row['ymin_n'])
-                        ymax = float(row['ymax_n'])
-                        
-                        payload = '[{"x":' + str(xmin) + ', "y":' + str(ymin) + '},{"x":' + str(xmax) +', "y":'+str(ymin) + '},{"x":' + str(xmax) + ', "y":' + str(ymax) + '},{"x":' + str(xmin) + ', "y":' + str(ymax) + '}]'
+                        label = row["defect"]
+                        xmin = float(row["xmin_n"])
+                        xmax = float(row["xmax_n"])
+                        ymin = float(row["ymin_n"])
+                        ymax = float(row["ymax_n"])
 
-                        print('payload: ', payload)
+                        payload = (
+                            '[{"x":'
+                            + str(xmin)
+                            + ', "y":'
+                            + str(ymin)
+                            + '},{"x":'
+                            + str(xmax)
+                            + ', "y":'
+                            + str(ymin)
+                            + '},{"x":'
+                            + str(xmax)
+                            + ', "y":'
+                            + str(ymax)
+                            + '},{"x":'
+                            + str(xmin)
+                            + ', "y":'
+                            + str(ymax)
+                            + "}]"
+                        )
+
+                        print("payload: ", payload)
 
                         send_label_to_api(file_guid, label, payload)
 
                 # combine final dataframe
-                df_f = pd.concat([df_f, df],ignore_index=True)
+                df_f = pd.concat([df_f, df], ignore_index=True)
 
             else:
                 print(f"Skipping {filename}: No associated .xml file found.")
 
     print("Defect plots generated successfully!")
-    df_f.to_csv('images-uploaded-to-s3.csv')
+    df_f.to_csv("images-uploaded-to-s3.csv")
     print(df_f)
 
 

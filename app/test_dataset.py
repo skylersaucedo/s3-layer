@@ -252,6 +252,15 @@ def test_dataset_file_add_tags():
     assert "test" in details_response_json["file"]["tags"][0]["tag"]
     assert "test tag" in details_response_json["file"]["tags"][1]["tag"]
 
+    duplicate_tags_response = client.post(
+        f"/dataset/{dataset_object_id}/tags",
+        data={"tag": "test tag"},
+        auth=(api_key, secret),
+    )
+
+    assert duplicate_tags_response.status_code == 400
+    assert duplicate_tags_response.json()["detail"] == "Tag already exists"
+
 
 @mock_s3
 def test_dataset_file_delete_tag():
@@ -370,6 +379,22 @@ def test_dataset_file_add_label():
 
     assert len(details_response_json["file"]["labels"]) == 1
     assert details_response_json["file"]["labels"][0]["label"] == "test label"
+
+    add_duplicate_label_response = client.post(
+        f"/dataset/{dataset_object_id}/labels",
+        data={
+            "label": "test label",
+            "polygon": json.dumps(
+                [
+                    {"x": 0.1, "y": 0.1},
+                    {"x": 0.9, "y": 0.1},
+                ]
+            ),
+        },
+        auth=(api_key, secret),
+    )
+
+    assert add_duplicate_label_response.status_code == 400
 
 
 @mock_s3

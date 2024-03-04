@@ -68,14 +68,10 @@ def dataset_upload_file(
     file_result = session.execute(file_query).all()
 
     if len(file_result) > 0 and len(file_result[0]) > 0:
-        file_object = file_result[0][0]
-
-        return {
-            "status": "error",
-            "message": "File already exists",
-            "s3_object_name": file_object.s3_object_name,
-            "dataset_object_id": file_object.id,
-        }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File already exists",
+        )
 
     s3_object_name = f"{uuid4()}-{file_name}"
 
@@ -195,7 +191,16 @@ def dataset_file_add_tag(
             detail="File not found",
         )
 
+    existing_tags = file_result[0].tags(session=session)
+
+    if tag in [t[0].tag for t in existing_tags]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tag already exists",
+        )
+
     tag_guid = uuid4()
+
     session.execute(
         insert(DatasetObjectTag).values(
             id=tag_guid,
@@ -265,7 +270,7 @@ def dataset_file_add_label(
     X and Y are represented as a percentage of the width and height of the image or video.
     """
     file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-    file_result = session.execute(file_query).one_or_none()
+    file_result: DatasetObject = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -295,6 +300,16 @@ def dataset_file_add_label(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid polygon: missing x or y",
             )
+
+    existing_labels = file_result[0].labels(session=session)
+
+    for existing_label in existing_labels:
+        if existing_label[0].label == label:
+            if existing_label[0].polygon == polygon:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Label already exists",
+                )
 
     label_guid = uuid4()
 
