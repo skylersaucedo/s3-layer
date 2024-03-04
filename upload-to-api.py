@@ -2,6 +2,7 @@
 using this to upload images to endpoint
 """
 
+import json
 import os
 
 # import matplotlib.pyplot as plt
@@ -14,6 +15,7 @@ import mimetypes
 import httpx
 
 mimetypes.init()
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -113,6 +115,8 @@ def upload_to_api(file_name, file_stream, file_mimetype):
     if file_details_response.status_code != 200:
         print("Something happened", file_details_response.status_code)
 
+        return None
+
     return file_details["dataset_object_id"]
 
 
@@ -131,18 +135,19 @@ def get_uploaded_files():
 
 def upload_tag_to_api(file_guid, tag):
     """send tag to endpoint. Tag must be string"""
-    tag_url = f"{API_ROOT}/dataset/{file_guid}/tags"
-
-    payload = {"tag": tag}
 
     tag_details_response = httpx.post(
-        tag_url,
-        data=payload,
+        f"{API_ROOT}/dataset/{file_guid}/tags",
+        data={"tag": tag},
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
 
+    if tag_details_response.status_code != 200:
+        print("Something happened", tag_details_response.status_code)
+
     out = tag_details_response.json()
+
     print("tag response: ", out)
 
 
@@ -151,11 +156,13 @@ def send_label_to_api(file_guid, label, defect_response):
 
     label_details_response = httpx.post(
         f"{API_ROOT}/dataset/{file_guid}/labels",
-        data={"label": label, "polygon": [defect_response]},
-        # files=defect_response,
+        data={"label": label, "polygon": json.dumps(defect_response)},
         auth=(API_KEY, API_SECRET),
         timeout=600.0,
     )
+
+    if label_details_response.status_code != 200:
+        print("Something happened", label_details_response.status_code)
 
     label_details_response = label_details_response.json()
 
@@ -184,6 +191,7 @@ def main():
 
     for filename in os.listdir(combined_folder):
         print(filename)
+
         if filename.endswith(".bmp"):
             image_path = os.path.join(combined_folder, filename)
             xml_path = os.path.join(combined_folder, filename.replace(".bmp", ".xml"))
@@ -202,50 +210,41 @@ def main():
 
                     file_mimetype = mimetypes.guess_type(image_path)[0]
                     print(f"File mimetype: {file_mimetype}")
+
                     file_guid = upload_to_api(image_path, f, file_mimetype)
-                    print(f"Uploaded {image_path} as {file_guid}")
-                    image_cache.append(file_hash)
 
-                    tag_string = "RetinaNet-POC"
-                    upload_tag_to_api(file_guid, tag_string)
+                if file_guid is None:
+                    print(f"Failed to upload {image_path}")
+                    continue
 
-                    ## -- Add each defect associated with each unique image
+                print(f"Uploaded {image_path} as {file_guid}")
+                image_cache.append(file_hash)
 
-                    for index, row in df.iterrows():
-                        # cycle through each defect
-                        label = row["defect"]
-                        xmin = float(row["xmin_n"])
-                        xmax = float(row["xmax_n"])
-                        ymin = float(row["ymin_n"])
-                        ymax = float(row["ymax_n"])
+                upload_tag_to_api(file_guid, "RetinaNet-POC")
 
-                        payload = (
-                            '[{"x":'
-                            + str(xmin)
-                            + ', "y":'
-                            + str(ymin)
-                            + '},{"x":'
-                            + str(xmax)
-                            + ', "y":'
-                            + str(ymin)
-                            + '},{"x":'
-                            + str(xmax)
-                            + ', "y":'
-                            + str(ymax)
-                            + '},{"x":'
-                            + str(xmin)
-                            + ', "y":'
-                            + str(ymax)
-                            + "}]"
-                        )
+                ## -- Add each defect associated with each unique image
 
-                        print("payload: ", payload)
+                for index, row in df.iterrows():
+                    # cycle through each defect
+                    label = row["defect"]
+                    xmin = float(row["xmin_n"])
+                    xmax = float(row["xmax_n"])
+                    ymin = float(row["ymin_n"])
+                    ymax = float(row["ymax_n"])
 
-                        send_label_to_api(file_guid, label, payload)
+                    payload = [
+                        {"x": xmin, "y": ymin},
+                        {"x": xmax, "y": ymin},
+                        {"x": xmax, "y": ymax},
+                        {"x": xmin, "y": ymax},
+                    ]
+
+                    print("payload: ", payload)
+
+                    send_label_to_api(file_guid, label, payload)
 
                 # combine final dataframe
                 df_f = pd.concat([df_f, df], ignore_index=True)
-
             else:
                 print(f"Skipping {filename}: No associated .xml file found.")
 

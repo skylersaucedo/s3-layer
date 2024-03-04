@@ -69,7 +69,7 @@ def dataset_upload_file(
 
     if len(file_result) > 0 and len(file_result[0]) > 0:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="File already exists",
         )
 
