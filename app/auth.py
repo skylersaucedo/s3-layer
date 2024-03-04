@@ -1,21 +1,26 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from .db.models import APICredentials
-from .db.engine import SessionLocal
 from sqlalchemy import select
+from sqlalchemy.orm import Session
+from typing import Annotated
 
-security = HTTPBasic()
+from .db.models import APICredentials
+from .db.engine import get_local_session
+
+b = HTTPBasic()
 
 
-def authenticate_user(credentials: HTTPBasicCredentials = Depends(security)):
-    with SessionLocal() as session:
-        stmt = select(APICredentials).where(
-            APICredentials.api_key == credentials.username.encode("utf8")
-        )
+def authenticate_user(
+    credentials: Annotated[HTTPBasicCredentials, Depends(b)],
+    session: Annotated[Session, Depends(get_local_session)],
+):
+    stmt = select(APICredentials).where(
+        APICredentials.api_key == credentials.username.encode("utf8")
+    )
 
-        result = session.execute(stmt)
+    result = session.execute(stmt)
 
-        valid_users = result.all()
+    valid_users = result.all()
 
     if len(valid_users) == 0 or len(valid_users) > 1:
         raise HTTPException(

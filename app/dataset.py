@@ -15,11 +15,12 @@ from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasicCredentials
 from mimetypes import guess_type
 from sqlalchemy import insert, select
+from sqlalchemy.orm import Session
 from typing import Annotated
 from uuid import uuid4, UUID
 
 from .auth import authenticate_user
-from .db.engine import SessionLocal
+from .db.engine import get_local_session
 from .db.models import (
     DatasetObject,
     DatasetObjectLabel,
@@ -36,6 +37,7 @@ from .types import (
 def dataset_upload_file(
     file: Annotated[UploadFile, File(...)],
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
     tags: Annotated[list[str], Form(...)] = None,
 ) -> UploadFileResponse:
     s3 = boto3.client("s3")
@@ -56,21 +58,20 @@ def dataset_upload_file(
     file.file.seek(0)
 
     # see if a file with this hash already exists
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(
-            DatasetObject.file_hash_sha1 == sha1.hexdigest()
-        )
-        file_result = session.execute(file_query).all()
+    file_query = select(DatasetObject).where(
+        DatasetObject.file_hash_sha1 == sha1.hexdigest()
+    )
+    file_result = session.execute(file_query).all()
 
-        if len(file_result) > 0 and len(file_result[0]) > 0:
-            file_object = file_result[0][0]
+    if len(file_result) > 0 and len(file_result[0]) > 0:
+        file_object = file_result[0][0]
 
-            return {
-                "status": "error",
-                "message": "File already exists",
-                "s3_object_name": file_object.s3_object_name,
-                "dataset_object_id": file_object.id,
-            }
+        return {
+            "status": "error",
+            "message": "File already exists",
+            "s3_object_name": file_object.s3_object_name,
+            "dataset_object_id": file_object.id,
+        }
 
     s3_object_name = f"{uuid4()}-{file_name}"
 
@@ -80,30 +81,29 @@ def dataset_upload_file(
         s3_object_name,
     )
 
-    with SessionLocal() as session:
-        dso_result = session.execute(
-            insert(DatasetObject).values(
-                id=uuid4(),
-                name=file_name,
-                s3_object_name=s3_object_name,
-                content_type=content_type,
-                file_hash_sha1=sha1.hexdigest(),
-            )
+    dso_result = session.execute(
+        insert(DatasetObject).values(
+            id=uuid4(),
+            name=file_name,
+            s3_object_name=s3_object_name,
+            content_type=content_type,
+            file_hash_sha1=sha1.hexdigest(),
         )
+    )
 
-        dso_id = dso_result.inserted_primary_key[0]
+    dso_id = dso_result.inserted_primary_key[0]
 
-        if tags:
-            for tag in tags:
-                session.execute(
-                    insert(DatasetObjectTag).values(
-                        id=uuid4(),
-                        dataset_object_id=dso_id,
-                        tag=tag,
-                    )
+    if tags:
+        for tag in tags:
+            session.execute(
+                insert(DatasetObjectTag).values(
+                    id=uuid4(),
+                    dataset_object_id=dso_id,
+                    tag=tag,
                 )
+            )
 
-        session.commit()
+    session.commit()
 
     return {
         "status": "OK",
@@ -115,10 +115,10 @@ def dataset_upload_file(
 def dataset_download_file(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
 ):
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -141,10 +141,10 @@ def dataset_download_file(
 def dataset_delete_file(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
 ) -> BasicResponse:
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -161,18 +161,17 @@ def dataset_delete_file(
         Key=file_object.s3_object_name,
     )
 
-    with SessionLocal() as session:
-        session.execute(
-            DatasetObjectTag.__table__.delete().where(
-                DatasetObjectTag.dataset_object_id == file_guid,
-            )
+    session.execute(
+        DatasetObjectTag.__table__.delete().where(
+            DatasetObjectTag.dataset_object_id == file_guid,
         )
-        session.commit()
+    )
+    session.commit()
 
-        session.execute(
-            DatasetObject.__table__.delete().where(DatasetObject.id == file_guid)
-        )
-        session.commit()
+    session.execute(
+        DatasetObject.__table__.delete().where(DatasetObject.id == file_guid)
+    )
+    session.commit()
 
     return {"status": "OK"}
 
@@ -180,11 +179,11 @@ def dataset_delete_file(
 def dataset_file_add_tag(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
-    tag: Annotated[str, Form(...)],
+    session: Annotated[Session, Depends(get_local_session)],
+    tag: Annotated[str, Form(...)] = None,
 ):
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -192,17 +191,16 @@ def dataset_file_add_tag(
             detail="File not found",
         )
 
-    with SessionLocal() as session:
-        tag_guid = uuid4()
-        session.execute(
-            insert(DatasetObjectTag).values(
-                id=tag_guid,
-                dataset_object_id=file_guid,
-                tag=tag,
-            )
+    tag_guid = uuid4()
+    session.execute(
+        insert(DatasetObjectTag).values(
+            id=tag_guid,
+            dataset_object_id=file_guid,
+            tag=tag,
         )
+    )
 
-        session.commit()
+    session.commit()
 
     return {
         "status": "OK",
@@ -215,12 +213,12 @@ def dataset_file_add_tag(
 
 def dataset_file_delete_tag(
     file_guid: UUID,
-    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     tag_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
 ) -> BasicResponse:
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -228,12 +226,11 @@ def dataset_file_delete_tag(
             detail="File not found",
         )
 
-    with SessionLocal() as session:
-        tag_query = select(DatasetObjectTag).where(
-            DatasetObjectTag.dataset_object_id == file_guid,
-            DatasetObjectTag.id == tag_guid,
-        )
-        tag_result = session.execute(tag_query).one_or_none()
+    tag_query = select(DatasetObjectTag).where(
+        DatasetObjectTag.dataset_object_id == file_guid,
+        DatasetObjectTag.id == tag_guid,
+    )
+    tag_result = session.execute(tag_query).one_or_none()
 
     if not tag_result:
         raise HTTPException(
@@ -241,30 +238,30 @@ def dataset_file_delete_tag(
             detail="Tag not found",
         )
 
-    with SessionLocal() as session:
-        session.execute(
-            DatasetObjectTag.__table__.delete().where(
-                DatasetObjectTag.dataset_object_id == file_guid,
-                DatasetObjectTag.id == tag_guid,
-            )
+    session.execute(
+        DatasetObjectTag.__table__.delete().where(
+            DatasetObjectTag.dataset_object_id == file_guid,
+            DatasetObjectTag.id == tag_guid,
         )
-        session.commit()
+    )
+
+    session.commit()
 
     return {"status": "OK"}
 
 
 def dataset_file_add_label(
     file_guid: UUID,
-    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     label: Annotated[str, Form(...)],
     polygon: Annotated[str, Form(...)],
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
 ):
     """Add a label to a file in the dataset. The polygon is a JSON string with a list of nodes in the form of {"x": 0.0, "y": 0.0}.
     X and Y are represented as a percentage of the width and height of the image or video.
     """
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -295,18 +292,17 @@ def dataset_file_add_label(
                 detail="Invalid polygon: missing x or y",
             )
 
-    with SessionLocal() as session:
-        label_guid = uuid4()
-        session.execute(
-            insert(DatasetObjectLabel).values(
-                id=label_guid,
-                dataset_object_id=file_guid,
-                label=label,
-                polygon=polygon,
-            )
+    label_guid = uuid4()
+    session.execute(
+        insert(DatasetObjectLabel).values(
+            id=label_guid,
+            dataset_object_id=file_guid,
+            label=label,
+            polygon=polygon,
         )
+    )
 
-        session.commit()
+    session.commit()
 
     return {
         "status": "OK",
@@ -320,12 +316,12 @@ def dataset_file_add_label(
 
 def dataset_file_delete_label(
     file_guid: UUID,
-    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     label_guid: UUID,
+    credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
 ) -> BasicResponse:
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -333,12 +329,11 @@ def dataset_file_delete_label(
             detail="File not found",
         )
 
-    with SessionLocal() as session:
-        label_query = select(DatasetObjectLabel).where(
-            DatasetObjectLabel.dataset_object_id == file_guid,
-            DatasetObjectLabel.id == label_guid,
-        )
-        label_result = session.execute(label_query).one_or_none()
+    label_query = select(DatasetObjectLabel).where(
+        DatasetObjectLabel.dataset_object_id == file_guid,
+        DatasetObjectLabel.id == label_guid,
+    )
+    label_result = session.execute(label_query).one_or_none()
 
     if not label_result:
         raise HTTPException(
@@ -346,28 +341,28 @@ def dataset_file_delete_label(
             detail="Label not found",
         )
 
-    with SessionLocal() as session:
-        session.execute(
-            DatasetObjectLabel.__table__.delete().where(
-                DatasetObjectLabel.dataset_object_id == file_guid,
-                DatasetObjectLabel.id == label_guid,
-            )
+    session.execute(
+        DatasetObjectLabel.__table__.delete().where(
+            DatasetObjectLabel.dataset_object_id == file_guid,
+            DatasetObjectLabel.id == label_guid,
         )
-        session.commit()
+    )
+
+    session.commit()
 
     return {"status": "OK"}
 
 
 def dataset_file_update_label(
-    file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
+    file_guid: UUID,
     label_guid: UUID,
     label: Annotated[str, Form(...)],
     polygon: Annotated[str, Form(...)],
 ) -> BasicResponse:
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(
@@ -375,12 +370,11 @@ def dataset_file_update_label(
             detail="File not found",
         )
 
-    with SessionLocal() as session:
-        label_query = select(DatasetObjectLabel).where(
-            DatasetObjectLabel.dataset_object_id == file_guid,
-            DatasetObjectLabel.id == label_guid,
-        )
-        label_result = session.execute(label_query).one_or_none()
+    label_query = select(DatasetObjectLabel).where(
+        DatasetObjectLabel.dataset_object_id == file_guid,
+        DatasetObjectLabel.id == label_guid,
+    )
+    label_result = session.execute(label_query).one_or_none()
 
     if not label_result:
         raise HTTPException(
@@ -411,19 +405,18 @@ def dataset_file_update_label(
                 detail="Invalid polygon: missing x or y",
             )
 
-    with SessionLocal() as session:
-        session.execute(
-            DatasetObjectLabel.__table__.update()
-            .where(
-                DatasetObjectLabel.dataset_object_id == file_guid,
-                DatasetObjectLabel.id == label_guid,
-            )
-            .values(
-                label=label,
-                polygon=polygon,
-            )
+    session.execute(
+        DatasetObjectLabel.__table__.update()
+        .where(
+            DatasetObjectLabel.dataset_object_id == file_guid,
+            DatasetObjectLabel.id == label_guid,
         )
-        session.commit()
+        .values(
+            label=label,
+            polygon=polygon,
+        )
+    )
+    session.commit()
 
     return {"status": "OK"}
 
@@ -431,14 +424,14 @@ def dataset_file_update_label(
 def dataset_file_details(
     file_guid: UUID,
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
 ) -> DatasetFileDetails:
-    with SessionLocal() as session:
-        file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(DatasetObject).where(DatasetObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
-        file = file_result[0]  # DatasetObject is in the first element of the tuple
+    file = file_result[0]  # DatasetObject is in the first element of the tuple
 
-        file_as_dict = file.as_dict(session=session)
+    file_as_dict = file.as_dict(session=session)
 
     if not file_result:
         raise HTTPException(
@@ -454,24 +447,24 @@ def dataset_file_details(
 
 def dataset_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
     search_tags: Annotated[list[str], Form(...)] = None,
 ) -> ListFilesResponse:
     """List all files in the dataset."""
-    with SessionLocal() as session:
-        files_query = select(DatasetObject).order_by("name")
-        files_result = session.execute(files_query).all()
+    files_query = select(DatasetObject).order_by("name")
+    files_result = session.execute(files_query).all()
 
-        files_list = []
-        search_tags_set = frozenset(search_tags) if search_tags else {}
+    files_list = []
+    search_tags_set = frozenset(search_tags) if search_tags else {}
 
-        for row in files_result:
-            file = row[0]  # DatasetObject is in the first element of the tuple
-            tags = frozenset([t[0].tag for t in file.tags(session=session)])
+    for row in files_result:
+        file = row[0]  # DatasetObject is in the first element of the tuple
+        tags = frozenset([t[0].tag for t in file.tags(session=session)])
 
-            if search_tags and len(tags.intersection(search_tags_set)) > 0:
-                continue
+        if search_tags and len(tags.intersection(search_tags_set)) > 0:
+            continue
 
-            files_list.append(file.as_dict(session=session))
+        files_list.append(file.as_dict(session=session))
 
     return {
         "status": "OK",

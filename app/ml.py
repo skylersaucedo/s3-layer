@@ -15,12 +15,13 @@ from fastapi import (
 from fastapi.exceptions import HTTPException
 from fastapi.security import HTTPBasicCredentials
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 from typing import Annotated
 from uuid import UUID
 
 from .auth import authenticate_user
 from .types import Prediction, InferenceResponse
-from .db.engine import SessionLocal
+from .db.engine import get_local_session
 from .db.models import MLModelObject
 
 resnet_model = torchvision.models.get_model(
@@ -92,12 +93,12 @@ def detect_defects(image_data: cv2.typing.MatLike, model_data) -> list[Predictio
 
 def model_inference(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
+    session: Annotated[Session, Depends(get_local_session)],
     file_guid: UUID,
     file: Annotated[UploadFile, File(...)],
 ) -> InferenceResponse:
-    with SessionLocal() as session:
-        file_query = select(MLModelObject).where(MLModelObject.id == file_guid)
-        file_result = session.execute(file_query).one_or_none()
+    file_query = select(MLModelObject).where(MLModelObject.id == file_guid)
+    file_result = session.execute(file_query).one_or_none()
 
     if not file_result:
         raise HTTPException(

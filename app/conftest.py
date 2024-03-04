@@ -5,8 +5,6 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-dotenv.load_dotenv(dotenv_path="test.env")
-
 
 def create_database():
     from .db.commands.generate_ddl import generate_ddl
@@ -56,6 +54,10 @@ def drop_database():
 
 @pytest.fixture(scope="session", autouse=True)
 def my_fixture():
+    print(os.environ.get("TESTING", "false").lower())
+    if os.environ.get("TESTING", "false").lower() != "true":
+        raise ValueError("You should not run tests on a production database")
+
     create_database()
     yield  # this is where the testing happens
     drop_database()

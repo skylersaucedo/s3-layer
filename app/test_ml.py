@@ -1,14 +1,13 @@
-from fastapi.testclient import TestClient
-from moto import mock_s3
-
 import boto3
 import cv2
-import io
 import os
 
 from .db.commands.create_api_key import create_api_key
 from .main import app
 from .ml import detect_defects
+
+from fastapi.testclient import TestClient
+from moto import mock_s3
 
 TEST_PATH = os.path.dirname(os.path.realpath(__file__))
 

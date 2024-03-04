@@ -1,6 +1,8 @@
 import dotenv
 import os
 
+dotenv.load_dotenv()
+
 from fastapi import (
     Depends,
     FastAPI,
@@ -12,7 +14,11 @@ from mimetypes import init as mimetypes_init
 from typing import Annotated
 
 from .auth import authenticate_user
-from .types import BasicResponse, InferenceResponse, UploadFileResponse
+from .types import (
+    BasicResponse,
+    InferenceResponse,
+    UploadFileResponse,
+)
 from .dataset import (
     dataset_upload_file,
     dataset_list_files,
@@ -37,8 +43,6 @@ from .model import (
 
 
 mimetypes_init()
-
-dotenv.load_dotenv()
 
 app = FastAPI()
 app.debug = os.getenv("DEBUG", False)
