@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import random
 
 from fastapi.testclient import TestClient
 from moto import mock_s3
@@ -493,6 +494,33 @@ def test_dataset_file_delete_label():
 def test_dataset_list_files():
     api_key, secret = create_api_key("test_list_files")
 
+    s3_client = boto3.client("s3", region_name="us-east-1")
+    s3_client.create_bucket(Bucket=os.environ["DATASET_S3_BUCKET"])
+
+    random_file_count = random.randint(10, 99)
+    test_tag_file_count = 0
+
+    for i in range(random_file_count):
+        test_file_contents = generate_random_bytes()
+        test_file = io.BytesIO(test_file_contents)
+
+        tag = "test" if i % 2 == 0 else "not_test"
+
+        if tag == "test":
+            test_tag_file_count += 1
+
+        upload_response = client.post(
+            "/dataset",
+            files={"file": (f"test_file_{i}.csv", test_file)},
+            data={"tags": [tag]},
+            auth=(api_key, secret),
+        )
+
+        assert upload_response.status_code == 200
+        upload_response_json = upload_response.json()
+
+        assert upload_response_json["status"] == "OK"
+
     response = client.get(
         "/dataset",
         auth=(api_key, secret),
@@ -503,10 +531,11 @@ def test_dataset_list_files():
 
     assert response_json["status"] == "OK"
     assert len(response_json["files"]) == response_json["count"]
+    assert response_json["total_count"] == random_file_count
 
     response = client.get(
         "/dataset",
-        params={"tags": ["test"]},
+        params={"search_tags": "test", "limit": 100, "offset": 0},
         auth=(api_key, secret),
     )
 
@@ -514,4 +543,20 @@ def test_dataset_list_files():
     response_json = response.json()
 
     assert response_json["status"] == "OK"
-    assert len(response_json["files"]) == response_json["count"]
+    assert len(response_json["files"]) == test_tag_file_count
+    assert response_json["count"] == test_tag_file_count
+    assert response_json["total_count"] == random_file_count
+
+    response = client.get(
+        "/dataset",
+        params={"limit": 5, "offset": 0},
+        auth=(api_key, secret),
+    )
+
+    assert response.status_code == 200
+    response_json = response.json()
+
+    assert response_json["status"] == "OK"
+    assert len(response_json["files"]) == 5
+    assert response_json["count"] == 5
+    assert response_json["total_count"] == random_file_count

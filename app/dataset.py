@@ -15,7 +15,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.security import HTTPBasicCredentials
 from mimetypes import guess_type
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, func
 from sqlalchemy.orm import Session
 from typing import Annotated
 from uuid import uuid4, UUID
@@ -468,14 +468,31 @@ def dataset_file_details(
 def dataset_list_files(
     credentials: Annotated[HTTPBasicCredentials, Depends(authenticate_user)],
     session: Annotated[Session, Depends(get_local_session)],
-    search_tags: Annotated[list[str], Form(...)] = None,
+    search_tags: str = None,
+    limit: int = None,
+    offset: int = None,
 ) -> ListFilesResponse:
-    """List all files in the dataset."""
+    """
+    List all files in the dataset. Search tags is a comma separated list of tags
+    to filter the files by. Limit is the number of files to return. Offset is the
+    number of files to skip.
+    """
+
+    total_files = session.query(func.count(DatasetObject.id)).scalar()
+
     files_query = select(DatasetObject).order_by("name")
+
+    if limit:
+        files_query = files_query.limit(limit)
+
+    if offset:
+        files_query = files_query.offset(offset)
+
     files_result = session.execute(files_query).all()
 
     files_list = []
-    search_tags_set = frozenset(search_tags) if search_tags else {}
+
+    search_tags_set = frozenset(search_tags.split(",")) if search_tags else {}
 
     for row in files_result:
         file = row[0]  # DatasetObject is in the first element of the tuple
@@ -490,4 +507,5 @@ def dataset_list_files(
         "status": "OK",
         "files": files_list,
         "count": len(files_list),
+        "total_count": total_files,
     }

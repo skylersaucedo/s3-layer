@@ -69,3 +69,4 @@ class ListFilesResponse(BaseModel):
     status: str
     files: list[DatasetFile]
     count: int
+    total_count: int
