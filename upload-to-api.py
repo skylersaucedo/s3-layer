@@ -101,7 +101,15 @@ def grab_defect_data(image_path, xml_path):
     )
     return df
 
+def delete_data_object(file_guid):
+    list_response = httpx.delete(
+        f"{API_ROOT}/dataset/{file_guid}",
+        auth=(os.environ["API_KEY"], os.environ["API_SECRET"]),
+    )
 
+    json_response = list_response.json()
+    return json_response
+    
 def upload_to_api(file_name, file_stream, file_mimetype):
     file_details_response = httpx.post(
         f"{API_ROOT}/dataset",
