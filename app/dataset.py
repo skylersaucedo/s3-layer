@@ -169,6 +169,13 @@ def dataset_delete_file(
     session.commit()
 
     session.execute(
+        DatasetObjectLabel.__table__.delete().where(
+            DatasetObjectLabel.dataset_object_id == file_guid,
+        )
+    )
+    session.commit()
+
+    session.execute(
         DatasetObject.__table__.delete().where(DatasetObject.id == file_guid)
     )
     session.commit()
