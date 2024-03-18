@@ -31,7 +31,7 @@ from .dataset import (
     dataset_file_delete_tag,
     dataset_delete_file,
 )
-from .ml import model_inference
+from .ml.ml import model_inference
 from .model import (
     model_upload_file,
     model_download_file,
