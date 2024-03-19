@@ -359,8 +359,8 @@ def train_model(tags: list = None):
 
     resnet_model.to("cpu")
 
-    for epoch in range(26):
-        return train_one_epoch(
+    for epoch in range(3):
+        train_one_epoch(
             resnet_model,
             optimizer,
             data_loader,
@@ -368,7 +368,7 @@ def train_model(tags: list = None):
             epoch,
         )
 
-        # lr_scheduler.step()
+        lr_scheduler.step()
 
         # if args.output_dir:
         #     checkpoint = {
